@@ -18,7 +18,7 @@ export default {
 				const serviceResponse = await foundService.fetch(request, subPath, env);
 
 				if (serviceResponse) {
-					serviceResponse.headers.set('Access-Control-Allow-Origin', '*');
+					serviceResponse.headers.set('Access-Control-Allow-Origin', 'https://uban-ai.ch');
 
 					return serviceResponse;
 				}

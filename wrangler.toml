@@ -1,0 +1,20 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "webdev-hs24-backend"
+main = "src/index.ts"
+compatibility_date = "2024-11-27"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[[kv_namespaces]]
+binding = "ACCOUNTS_KV"
+id = "884a5010458842d0be79511bd9844936"
+
+[[r2_buckets]]
+binding = "IMAGES_BUCKET"
+bucket_name = "webdev-hs24-images"
+
+[[send_email]]
+name = "EMAIL_BINDING"
+allowed_destination_addresses = ["noahgerber100@gmail.com", "noahgerber@antim8.com"]

@@ -18,7 +18,7 @@ export default {
 				const serviceResponse = await foundService.fetch(request, subPath, env);
 
 				if (serviceResponse) {
-					serviceResponse.headers.set('Access-Control-Allow-Origin', 'https://uban-ai.ch');
+					serviceResponse.headers.set('Access-Control-Allow-Origin', '*'); //change to https://urban-ai.ch once deployed
 
 					return serviceResponse;
 				}

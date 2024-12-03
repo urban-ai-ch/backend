@@ -64,13 +64,13 @@ const service: Service = {
 
 export async function authenticateToken(headers: Headers, env: Env): Promise<JWTPayload | Response> {
 	const authHeader = headers.get('Authorization');
-	if (!authHeader) return new Response('Access Denied', { status: 401 });
+	if (!authHeader) return new Response('Invalid token', { status: 401 });
 
 	const token = authHeader.split(' ')[1];
 	const context = await verifyJWT<JWTPayload>(token, env.JWT_SECRET);
 
 	if (!context) {
-		return new Response('Invalid Token', { status: 400 });
+		return new Response('Invalid token', { status: 401 });
 	}
 
 	return context; // verified is now typed as JWTPayload

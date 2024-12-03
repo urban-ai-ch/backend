@@ -8,6 +8,18 @@ export interface Service {
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
 		try {
+			if (request.method === 'OPTIONS') {
+				return new Response(null, {
+					status: 204,
+					headers: {
+						'Access-Control-Allow-Origin': '*', // TODO: update in production
+						'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+						'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+						'Access-Control-Max-Age': '86400',
+					},
+				});
+			}
+
 			const url = new URL(request.url);
 			const servicePath = `/${url.pathname.split('/').slice(1, 3).join('/')}/`;
 			const subPath = url.pathname.substring(servicePath.length);
@@ -18,7 +30,7 @@ export default {
 				const serviceResponse = await foundService.fetch(request, subPath, env);
 
 				if (serviceResponse) {
-					serviceResponse.headers.set('Access-Control-Allow-Origin', '*'); //change to https://urban-ai.ch once deployed
+					serviceResponse.headers.set('Access-Control-Allow-Origin', '*'); // TODO: update in production
 
 					return serviceResponse;
 				}

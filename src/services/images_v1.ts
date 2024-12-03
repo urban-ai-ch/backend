@@ -1,10 +1,10 @@
 import { Service } from '..';
 import { authenticateToken } from './auth_v1';
 
-type ImagesResponse = {
+type ImageObject = {
 	name: string;
 	href: string;
-}[];
+};
 
 const service: Service = {
 	path: '/images/v1/',
@@ -15,22 +15,42 @@ const service: Service = {
 
 		const args = subPath.split('/');
 		switch (request.method + ' ' + args[0]) {
-			case 'POST image': {
-				const fileBuffer = await request.arrayBuffer();
+			case 'POST images': {
+				const formData = await request.formData();
+				const files = formData.getAll('image');
 
-				// Validate file size (2MB)
-				const MAX_SIZE = 2 * 1024 * 1024;
-				if (fileBuffer.byteLength > MAX_SIZE) {
-					return new Response('File size exceeds 5MB limit', { status: 413 });
+				if (files.length >= 5) {
+					return new Response('You can only upload 5 files at once');
 				}
 
-				const uniqueName = `${authContext.username}-${crypto.randomUUID()}.jpg`;
+				// Validate file size (2MB for each file)
+				const MAX_SIZE = 2 * 1024 * 1024;
+				const filePromises = files.map(async (file) => {
+					if (!(file instanceof File)) {
+						return new Response('Invalid file type', { status: 400 });
+					}
 
-				await env.IMAGES_BUCKET.put(uniqueName, fileBuffer, {
-					httpMetadata: { contentType: 'image/jpeg' },
+					if (file.size > MAX_SIZE) {
+						return new Response('File size exceeds 2MB limit', { status: 413 });
+					}
+
+					const uniqueName = `${authContext.username}-${crypto.randomUUID()}.jpg`;
+
+					await env.IMAGES_BUCKET.put(uniqueName, file.stream(), {
+						httpMetadata: { contentType: 'image/jpeg' },
+					});
+
+					const response: ImageObject = {
+						name: uniqueName,
+						href: `${request.url}/${uniqueName}`,
+					};
+					return response;
 				});
 
-				return new Response('File uploaded successfully', { status: 200 });
+				const responses = await Promise.all(filePromises);
+
+				// Return the responses for all uploaded images
+				return new Response(JSON.stringify(responses), { status: 201 });
 			}
 			case 'GET image': {
 				const cacheKey = authContext.username + request.url;
@@ -68,7 +88,7 @@ const service: Service = {
 			case 'GET images': {
 				const listResponse = await env.IMAGES_BUCKET.list({ prefix: authContext.username });
 
-				const images: ImagesResponse = listResponse.objects.map((image) => {
+				const images: ImageObject[] = listResponse.objects.map((image) => {
 					return { name: image.key, href: request.url.replace('images', `image/${image.key}`) };
 				});
 

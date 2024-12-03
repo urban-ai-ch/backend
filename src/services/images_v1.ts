@@ -24,7 +24,7 @@ const service: Service = {
 					return new Response('File size exceeds 5MB limit', { status: 413 });
 				}
 
-				const uniqueName = `${authContext.username} - ${crypto.randomUUID()}.jpg`;
+				const uniqueName = `${authContext.username}-${crypto.randomUUID()}.jpg`;
 
 				await env.IMAGES_BUCKET.put(uniqueName, fileBuffer, {
 					httpMetadata: { contentType: 'image/jpeg' },

@@ -16,12 +16,7 @@ const service: Service = {
 				let response = await cache.match(cacheKey);
 
 				if (!response) {
-					const dataName = args[1];
-					if (!dataName.includes(authContext.username)) {
-						return new Response('Data not found', { status: 404 });
-					}
-
-					const data = await env.GEOSJON_BUCKET.get(dataName);
+					const data = await env.GEOSJON_BUCKET.get(args[1]);
 
 					if (!data) {
 						return new Response('Data not found', { status: 404 });

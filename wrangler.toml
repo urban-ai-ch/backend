@@ -15,6 +15,10 @@ id = "884a5010458842d0be79511bd9844936"
 binding = "IMAGES_BUCKET"
 bucket_name = "webdev-hs24-images"
 
+[[r2_buckets]]
+binding = "GEOSJON_BUCKET"
+bucket_name = "webdev-hs24-geodata"
+
 [[send_email]]
 name = "EMAIL_BINDING"
 allowed_destination_addresses = ["noahgerber100@gmail.com", "noahgerber@antim8.com"]

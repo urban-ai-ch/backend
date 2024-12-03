@@ -1,0 +1,55 @@
+import { Service } from '..';
+import { authenticateToken } from './auth_v1';
+
+type ImagesResponse = {
+	name: string;
+	href: string;
+}[];
+
+const service: Service = {
+	path: '/geojson/v1/',
+
+	fetch: async (request: Request, subPath: string, env: Env): Promise<Response | void> => {
+		const authContext = await authenticateToken(request.headers, env);
+		if (authContext instanceof Response) return authContext;
+
+		const args = subPath.split('/');
+		switch (request.method + ' ' + args[0]) {
+			case 'GET geojson': {
+				const cacheKey = authContext.username + request.url;
+				const cache = caches.default;
+				let response = await cache.match(cacheKey);
+
+				if (!response) {
+					const dataName = args[1];
+					if (!dataName.includes(authContext.username)) {
+						return new Response('Data not found');
+					}
+
+					const data = await env.GEOSJON_BUCKET.get(dataName);
+
+					if (!data) {
+						return new Response('Data not found');
+					}
+
+					const headers = new Headers();
+					data.writeHttpMetadata(headers);
+					headers.set('etag', data.httpEtag);
+
+					response = new Response(data.body, { status: 200, headers });
+					await cache.put(cacheKey, response.clone());
+				}
+
+				const headers = new Headers(response.headers);
+				headers.set('Cache-Control', 'private, max-age=31536000'); //1 year caching
+
+				return new Response(response.body, {
+					status: response.status,
+					headers: headers,
+				});
+			}
+		}
+	},
+};
+
+export default service;

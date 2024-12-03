@@ -17,13 +17,16 @@ const service: Service = {
 
 		switch (subPath.split('/')[0]) {
 			case 'broadcast':
-				recepients = ['noahgerber100@gmail.com', 'saimaneesh14@gmail.com'];
+				recepients = ['noahgerber100@gmail.com', 'saimaneesh14@gmail.com', 'ehomburg@ethz.ch'];
 				break;
 			case 'noah':
 				recepients = ['noahgerber100@gmail.com'];
 				break;
 			case 'sai':
 				recepients = ['saimaneesh14@gmail.com'];
+				break;
+			case 'eren':
+				recepients = ['ehomburg@ethz.ch'];
 				break;
 			default:
 				return;

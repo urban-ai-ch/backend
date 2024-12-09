@@ -4,6 +4,12 @@ import { authenticateToken } from './auth_v1';
 type UserResponse = {
 	username: string;
 	email: string;
+	bio: string;
+};
+
+type UserPayload = {
+	email?: string;
+	bio?: string;
 };
 
 const service: Service = {
@@ -24,9 +30,32 @@ const service: Service = {
 				const responseData: UserResponse = {
 					email: userData.email,
 					username: userData.username,
+					bio: userData.bio ?? '',
 				};
 
 				return new Response(JSON.stringify(responseData), { status: 200 });
+			}
+			case 'POST me': {
+				const authContext = await authenticateToken(request.headers, env);
+				if (authContext instanceof Response) return authContext;
+
+				const payload = await request.json<UserPayload>();
+				const userData: AccountKV | null = await env.ACCOUNTS_KV.get(authContext.username, 'json');
+
+				if (!userData) {
+					return new Response('User not found', { status: 400 });
+				}
+
+				const newUserData: AccountKV = {
+					username: userData.username,
+					password: userData.password,
+					email: payload.email ?? userData.email,
+					bio: payload.bio ?? userData.bio,
+				};
+
+				await env.ACCOUNTS_KV.put(authContext.username, JSON.stringify(newUserData));
+
+				return new Response('User data updated', { status: 200 });
 			}
 		}
 	},

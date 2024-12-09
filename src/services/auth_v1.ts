@@ -28,7 +28,7 @@ const service: Service = {
 	fetch: async (request: Request, subPath: string, env: Env): Promise<Response | void> => {
 		switch (request.method + ' ' + subPath.split('/')[0]) {
 			case 'POST signup': {
-				return new Response('Login disabled', { status: 400 });
+				return new Response('Signup disabled', { status: 409 });
 
 				const { username, password, email } = await request.json<SignUpPayload>();
 

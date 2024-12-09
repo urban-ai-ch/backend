@@ -16,9 +16,10 @@ const service: Service = {
 	path: '/users/v1/',
 
 	fetch: async (request: Request, subPath: string, env: Env): Promise<Response | void> => {
+		const authContext = await authenticateToken(request.headers, env);
+
 		switch (request.method + ' ' + subPath.split('/')[0]) {
 			case 'GET me': {
-				const authContext = await authenticateToken(request.headers, env);
 				if (authContext instanceof Response) return authContext;
 
 				const userData: AccountKV | null = await env.ACCOUNTS_KV.get(authContext.username, 'json');
@@ -36,7 +37,6 @@ const service: Service = {
 				return new Response(JSON.stringify(responseData), { status: 200 });
 			}
 			case 'POST me': {
-				const authContext = await authenticateToken(request.headers, env);
 				if (authContext instanceof Response) return authContext;
 
 				const payload = await request.json<UserPayload>();

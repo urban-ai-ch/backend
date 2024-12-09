@@ -11,11 +11,12 @@ const service: Service = {
 
 	fetch: async (request: Request, subPath: string, env: Env): Promise<Response | void> => {
 		const authContext = await authenticateToken(request.headers, env);
-		if (authContext instanceof Response) return authContext;
 
 		const args = subPath.split('/');
 		switch (request.method + ' ' + args[0]) {
 			case 'POST images': {
+				if (authContext instanceof Response) return authContext;
+
 				const formData = await request.formData();
 				const files = formData.getAll('image');
 
@@ -53,16 +54,11 @@ const service: Service = {
 				return new Response(JSON.stringify(responses), { status: 201 });
 			}
 			case 'GET image': {
-				const cacheKey = authContext.username + request.url;
 				const cache = caches.default;
-				let response = await cache.match(cacheKey);
+				let response = await cache.match(request.url);
 
 				if (!response) {
 					const imageName = args[1];
-					if (!imageName.includes(authContext.username)) {
-						return new Response('Image not found');
-					}
-
 					const image = await env.IMAGES_BUCKET.get(imageName);
 
 					if (!image) {
@@ -74,7 +70,7 @@ const service: Service = {
 					headers.set('etag', image.httpEtag);
 
 					response = new Response(image.body, { status: 200, headers });
-					await cache.put(cacheKey, response.clone());
+					await cache.put(request.url, response.clone());
 				}
 
 				const headers = new Headers(response.headers);
@@ -86,10 +82,11 @@ const service: Service = {
 				});
 			}
 			case 'GET images': {
+				if (authContext instanceof Response) return authContext;
 				const listResponse = await env.IMAGES_BUCKET.list({ prefix: authContext.username });
 
 				const images: ImageObject[] = listResponse.objects.map((image) => {
-					return { name: image.key, href: request.url.replace('images', `image/${image.key}`) };
+					return { name: image.key, href: request.url.replace(subPath, `${service.path}image/${image.key}`) };
 				});
 
 				return new Response(JSON.stringify(images));

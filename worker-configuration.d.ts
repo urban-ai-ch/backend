@@ -3,6 +3,7 @@
 interface Env {
 	ACCOUNTS_KV: KVNamespace;
 	JWT_SECRET: string;
+	REPLICATE_API_TOKEN: string;
 	IMAGES_BUCKET: R2Bucket;
 	GEOSJON_BUCKET: R2Bucket;
 	EMAIL_BINDING: SendEmail;

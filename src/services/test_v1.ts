@@ -5,12 +5,13 @@ const service: Service = {
 	path: '/test/v1/',
 
 	fetch: async (request: Request, subPath: string, env: Env): Promise<Response | void> => {
+		const authContext = await authenticateToken(request.headers, env);
+
 		switch (request.method + ' ' + subPath.split('/')[0]) {
 			case 'GET ping': {
 				return new Response('Pong');
 			}
 			case 'GET auth': {
-				const authContext = await authenticateToken(request.headers, env);
 				if (authContext instanceof Response) return authContext;
 
 				return new Response('You are logged in. Heureka!');

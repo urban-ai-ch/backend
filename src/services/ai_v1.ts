@@ -2,6 +2,7 @@ import Replicate from 'replicate';
 
 import { Service } from '..';
 import { authenticateToken } from './auth_v1';
+import { getImageURL } from './images_v1';
 
 type DetectionPayload = {
 	imageName: string;
@@ -22,18 +23,23 @@ const service: Service = {
 			case 'GET detection': {
 				const payload = await request.json<DetectionPayload>();
 
-				const imgUrl = request.url.replace(subPath, `/images/v1/image/${payload.imageName}`);
+				const imgUrl = getImageURL(request.url, payload.imageName);
 
 				const output = await replicate.run(
-					'idea-research/ram-grounded-sam:80a2aede4cf8e3c9f26e96c308d45b23c350dd36f1c381de790715007f1ac0ad',
+					'gerbernoah/grounding-dino-fork:4f5d21fed8f0a1a84f53f563f9748e069d2fa286dbd09e4e148a0b15ca871695',
 					{
 						input: {
-							use_sam_hq: true,
-							input_image: imgUrl,
+							image: imgUrl,
+							query: 'house facade',
+							box_threshold: 0.25,
+							text_threshold: 0.25,
+							show_visualisation: true,
 						},
 					}
 				);
+
 				console.log(output);
+				return new Response(JSON.stringify(output), { status: 200 });
 			}
 		}
 	},

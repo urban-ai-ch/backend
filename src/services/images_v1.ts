@@ -6,6 +6,10 @@ type ImageObject = {
 	href: string;
 };
 
+export const getImageURL = (url: string, imageName: string): string => {
+	return `https://${new URL(url).host}/images/v1/image/${imageName}`;
+};
+
 const service: Service = {
 	path: '/images/v1/',
 
@@ -32,26 +36,41 @@ const service: Service = {
 					}
 
 					if (file.size > MAX_SIZE) {
+						console.log('file size exeeded');
 						return new Response('File size exceeds 2MB limit', { status: 413 });
 					}
 
-					const uniqueName = `${authContext.username}-${crypto.randomUUID()}.jpg`;
+					const contentType = file.type;
+					const uniqueName = `${authContext.username}-${crypto.randomUUID()}.${contentType.split('/')[1]}`;
 
 					await env.IMAGES_BUCKET.put(uniqueName, file.stream(), {
-						httpMetadata: { contentType: 'image/jpeg' },
+						httpMetadata: { contentType: file.type },
 					});
 
 					const response: ImageObject = {
 						name: uniqueName,
-						href: `${request.url}/${uniqueName}`,
+						href: getImageURL(request.url, uniqueName),
 					};
 					return response;
 				});
 
-				const responses = await Promise.all(filePromises);
+				try {
+					const fileResponses = await Promise.all(filePromises);
 
-				// Return the responses for all uploaded images
-				return new Response(JSON.stringify(responses), { status: 201 });
+					const responses = await Promise.all(
+						fileResponses.map((response) =>
+							response instanceof Response ? response.text().then((text) => ({ text, status: response.status })) : response
+						)
+					);
+
+					if (responses.length > 0) {
+						return new Response(JSON.stringify(responses), { status: 400 });
+					} else {
+						return new Response(JSON.stringify(fileResponses), { status: 200 });
+					}
+				} catch {
+					return new Response('Internal server error', { status: 500 });
+				}
 			}
 			case 'GET image': {
 				const cache = caches.default;
@@ -86,7 +105,7 @@ const service: Service = {
 				const listResponse = await env.IMAGES_BUCKET.list({ prefix: authContext.username });
 
 				const images: ImageObject[] = listResponse.objects.map((image) => {
-					return { name: image.key, href: request.url.replace(subPath, `${service.path}image/${image.key}`) };
+					return { name: image.key, href: getImageURL(request.url, image.key) };
 				});
 
 				return new Response(JSON.stringify(images));

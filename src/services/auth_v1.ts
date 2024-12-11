@@ -16,6 +16,10 @@ type AuthTokenResponse = {
 	token: string;
 };
 
+type AuthResponse = {
+	authenticated: boolean;
+};
+
 export type JWTPayload = {
 	iat: number;
 	jti: string;
@@ -26,6 +30,8 @@ const service: Service = {
 	path: '/auth/v1/',
 
 	fetch: async (request: Request, subPath: string, env: Env): Promise<Response | void> => {
+		const authContext = await authenticateToken(request.headers, env);
+
 		switch (request.method + ' ' + subPath.split('/')[0]) {
 			case 'POST signup': {
 				return new Response('Signup disabled', { status: 409 });
@@ -56,6 +62,13 @@ const service: Service = {
 				const token = await signJWT(payload, env.JWT_SECRET, 3600); // Type for the payload is inferred
 
 				const response: AuthTokenResponse = { token };
+				return new Response(JSON.stringify(response), { status: 200 });
+			}
+			case 'GET auth': {
+				const response: AuthResponse = {
+					authenticated: authContext instanceof Response,
+				};
+
 				return new Response(JSON.stringify(response), { status: 200 });
 			}
 		}

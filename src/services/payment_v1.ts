@@ -42,6 +42,7 @@ const service: Service = {
 						{
 							price_data: {
 								currency: 'chf',
+								unit_amount: 10,
 								product_data: {
 									name: 'Token',
 									description: 'Tokens consumed by different website services',

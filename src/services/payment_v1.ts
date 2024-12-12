@@ -2,6 +2,7 @@ import { FRONTEND_URL, Service } from '..';
 import { authenticateToken } from './auth_v1';
 
 import Stripe from 'stripe';
+import { sumItemsByName } from './webhooks_v1';
 
 type OrderPayload = {
 	amount: number;
@@ -12,8 +13,10 @@ type OrderResponse = {
 };
 
 type SessionStatusResponse = {
-	status: string;
-	customer_email: string;
+	status: string | null;
+	customer_email: string | null;
+	quantity: number | null;
+	amount_total: number | null;
 };
 
 const service: Service = {
@@ -73,17 +76,13 @@ const service: Service = {
 				try {
 					const session = await stripe.checkout.sessions.retrieve(url.searchParams.get('session_id') ?? '');
 
-					if (!session.status) {
-						return new Response('Session status not found', { status: 400 });
-					}
-
-					if (!session.customer_details?.email) {
-						return new Response('Session email not found', { status: 400 });
-					}
+					const quantity = session.line_items ? await sumItemsByName(session.line_items, 'Token', stripe) : null;
 
 					const response: SessionStatusResponse = {
 						status: session.status,
-						customer_email: session.customer_details.email,
+						customer_email: session.customer_details?.email ?? null,
+						amount_total: session.amount_total,
+						quantity: quantity,
 					};
 
 					return new Response(JSON.stringify(response), { status: 200 });

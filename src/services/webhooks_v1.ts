@@ -2,40 +2,43 @@ import Stripe from 'stripe';
 import { Service } from '..';
 import { authenticateToken } from './auth_v1';
 
+export const sumItemsByName = async (
+	lineItems: Stripe.ApiList<Stripe.LineItem>,
+	name: string,
+	stripe: Stripe,
+): Promise<number> => {
+	let totalAmount = 0;
+
+	for (const item of lineItems.data) {
+		if (!item.price) continue;
+
+		let product = item.price.product;
+		if (typeof product === 'string') product = await stripe.products.retrieve(product);
+		if (product.deleted) continue;
+
+		totalAmount += product.name === name ? (item.quantity ?? 0) : 0;
+	}
+
+	return lineItems.has_more
+		? totalAmount +
+				(await sumItemsByName(
+					await stripe.checkout.sessions.listLineItems('session_id', {
+						starting_after: lineItems.data[lineItems.data.length - 1].id,
+					}),
+					name,
+					stripe,
+				))
+		: totalAmount;
+};
+
 const service: Service = {
 	path: '/webhooks/v1/',
 
 	fetch: async (request: Request, subPath: string, env: Env): Promise<Response | void> => {
-		const authContext = await authenticateToken(request.headers, env);
-
 		switch (request.method + ' ' + subPath.split('/')[0]) {
 			case 'GET stripe': {
 				const event = await request.json<Stripe.Event>();
 				const stripe = new Stripe(env.STRIPE_PRIVATE_KEY);
-
-				const sumItemsByName = async (lineItems: Stripe.ApiList<Stripe.LineItem>, name: string): Promise<number> => {
-					let totalAmount = 0;
-
-					for (const item of lineItems.data) {
-						if (!item.price) continue;
-
-						let product = item.price.product;
-						if (typeof product === 'string') product = await stripe.products.retrieve(product);
-						if (product.deleted) continue;
-
-						totalAmount += product.name === name ? (item.quantity ?? 0) : 0;
-					}
-
-					return lineItems.has_more
-						? totalAmount +
-								(await sumItemsByName(
-									await stripe.checkout.sessions.listLineItems('session_id', {
-										starting_after: lineItems.data[lineItems.data.length - 1].id,
-									}),
-									name,
-								))
-						: totalAmount;
-				};
 
 				switch (event.type) {
 					case 'checkout.session.completed':
@@ -50,7 +53,7 @@ const service: Service = {
 						}
 
 						const username = paymentIntent.metadata['username'];
-						const quantity = await sumItemsByName(paymentIntent.line_items, 'Token');
+						const quantity = await sumItemsByName(paymentIntent.line_items, 'Token', stripe);
 
 						const tokensResult = await env.DB.prepare(
 							`SELECT token_count

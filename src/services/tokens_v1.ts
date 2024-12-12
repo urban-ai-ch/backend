@@ -14,7 +14,13 @@ const service: Service = {
 
 		switch (request.method + ' ' + subPath.split('/')[0]) {
 			case 'POST preview': {
-				return new Response('Token Preview');
+				const payload = await request.json<OrderPayload>();
+
+				if (true) {
+					return new Response('Tokens updated successfully', { status: 200 });
+				} else {
+					return new Response('Order failed', { status: 500 });
+				}
 			}
 			case 'GET order': {
 				return new Response('You bought some tokens');

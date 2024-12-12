@@ -45,13 +45,13 @@ const service: Service = {
 
 			return env.EMAIL_BINDING.send(message).then(
 				() => `Mail to ${recepient} sent`,
-				(e) => `Mail to ${recepient} failed: ${e}`
+				(e) => `Mail to ${recepient} failed: ${e}`,
 			);
 		});
 
 		return Promise.all(mailPromises).then(
 			(results) => new Response(JSON.stringify(results), { status: 201 }),
-			() => new Response('Internal server error', { status: 500 })
+			() => new Response('Internal server error', { status: 500 }),
 		);
 	},
 };

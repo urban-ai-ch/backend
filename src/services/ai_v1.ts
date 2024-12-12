@@ -35,7 +35,7 @@ const service: Service = {
 							text_threshold: 0.25,
 							show_visualisation: true,
 						},
-					}
+					},
 				);
 
 				console.log(output);

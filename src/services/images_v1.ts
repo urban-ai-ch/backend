@@ -59,8 +59,10 @@ const service: Service = {
 
 					const responses = await Promise.all(
 						fileResponses.map((response) =>
-							response instanceof Response ? response.text().then((text) => ({ text, status: response.status })) : response
-						)
+							response instanceof Response
+								? response.text().then((text) => ({ text, status: response.status }))
+								: response,
+						),
 					);
 
 					if (responses.length > 0) {

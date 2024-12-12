@@ -30,7 +30,9 @@ export async function signJWT(payload: object, secret: string, expiresIn?: numbe
 	const payloadBase64 = toBase64Url(encoder.encode(JSON.stringify(payloadWithExp)));
 	const toSign = `${headerBase64}.${payloadBase64}`;
 
-	const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+	const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [
+		'sign',
+	]);
 	const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(toSign));
 	const signatureBase64 = toBase64Url(new Uint8Array(signature));
 
@@ -43,7 +45,9 @@ export async function verifyJWT<T>(token: string, secret: string): Promise<T | n
 		return null;
 	}
 
-	const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+	const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [
+		'verify',
+	]);
 	const isValid = await crypto.subtle.verify(
 		'HMAC',
 		key,

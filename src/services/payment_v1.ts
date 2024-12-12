@@ -4,19 +4,15 @@ import { authenticateToken } from './auth_v1';
 import Stripe from 'stripe';
 import { sumItemsByName } from './webhooks_v1';
 
-type OrderPayload = {
-	amount: number;
-};
-
 type OrderResponse = {
 	clientSecret: string;
 };
 
 type SessionStatusResponse = {
-	status: string | null;
+	status: string;
+	quantity: number;
+	amount_total: number;
 	customer_email: string | null;
-	quantity: number | null;
-	amount_total: number | null;
 };
 
 const service: Service = {
@@ -30,7 +26,6 @@ const service: Service = {
 
 		switch (request.method + ' ' + subPath.split('/')[0]) {
 			case 'POST create-checkout-session': {
-				const payload = await request.json<OrderPayload>();
 				const account: AccountKV | null = await env.ACCOUNTS_KV.get(authContext.username, 'json');
 
 				if (!account) {
@@ -76,13 +71,17 @@ const service: Service = {
 				try {
 					const session = await stripe.checkout.sessions.retrieve(url.searchParams.get('session_id') ?? '');
 
-					const quantity = session.line_items ? await sumItemsByName(session.line_items, 'Token', stripe) : null;
+					if (!session.status || !session.amount_total || !session.line_items) {
+						return new Response('Fields missing', { status: 400 });
+					}
+
+					const quantity = await sumItemsByName(session.line_items, 'Token', stripe);
 
 					const response: SessionStatusResponse = {
 						status: session.status,
-						customer_email: session.customer_details?.email ?? null,
 						amount_total: session.amount_total,
 						quantity: quantity,
+						customer_email: session.customer_details?.email ?? null,
 					};
 
 					return new Response(JSON.stringify(response), { status: 200 });

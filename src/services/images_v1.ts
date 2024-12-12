@@ -54,24 +54,20 @@ const service: Service = {
 					return response;
 				});
 
-				try {
-					const fileResponses = await Promise.all(filePromises);
+				const fileResponses = await Promise.all(filePromises);
 
-					const responses = await Promise.all(
-						fileResponses.map((response) =>
-							response instanceof Response
-								? response.text().then((text) => ({ text, status: response.status }))
-								: response,
-						),
-					);
+				const responses = await Promise.all(
+					fileResponses.map((response) =>
+						response instanceof Response
+							? response.text().then((text) => ({ text, status: response.status }))
+							: response,
+					),
+				);
 
-					if (responses.length > 0) {
-						return new Response(JSON.stringify(responses), { status: 400 });
-					} else {
-						return new Response(JSON.stringify(fileResponses), { status: 200 });
-					}
-				} catch {
-					return new Response('Internal server error', { status: 500 });
+				if (responses.length > 0) {
+					return new Response(JSON.stringify(responses), { status: 400 });
+				} else {
+					return new Response(JSON.stringify(fileResponses), { status: 200 });
 				}
 			}
 			case 'GET image': {

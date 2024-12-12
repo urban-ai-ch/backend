@@ -1,5 +1,7 @@
 import * as services from './services';
 
+export const FRONTEND_URL = 'https://urban-ai.ch';
+
 export interface Service {
 	path: string;
 	fetch(request: Request, subPath: string, env: Env): Promise<Response | void>;

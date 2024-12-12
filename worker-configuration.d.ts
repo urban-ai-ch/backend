@@ -4,6 +4,7 @@ interface Env {
 	ACCOUNTS_KV: KVNamespace;
 	JWT_SECRET: string;
 	REPLICATE_API_TOKEN: string;
+	STRIPE_PRIVATE_KEY: string;
 	IMAGES_BUCKET: R2Bucket;
 	GEOSJON_BUCKET: R2Bucket;
 	DB: D1Database;

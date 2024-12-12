@@ -1,8 +1,8 @@
 import { Service } from '..';
 import { authenticateToken } from './auth_v1';
 
-type OrderPayload = {
-	amount: number;
+type TokenResponse = {
+	tokenCount: number;
 };
 
 const service: Service = {
@@ -13,17 +13,23 @@ const service: Service = {
 		if (authContext instanceof Response) return authContext;
 
 		switch (request.method + ' ' + subPath.split('/')[0]) {
-			case 'POST preview': {
-				const payload = await request.json<OrderPayload>();
+			case 'GET self': {
+				const username = 'a';
+				const amount = 0;
 
-				if (true) {
-					return new Response('Tokens updated successfully', { status: 200 });
-				} else {
-					return new Response('Order failed', { status: 500 });
-				}
-			}
-			case 'GET order': {
-				return new Response('You bought some tokens');
+				const tokensResult = await env.DB.prepare(
+					`SELECT token_count
+					FROM tokens
+					WHERE user_name = ?`,
+				)
+					.bind(username)
+					.first<TokensRow>();
+
+				const response: TokenResponse = {
+					tokenCount: tokensResult?.token_count ?? 0,
+				};
+
+				return new Response(JSON.stringify(response), { status: 200 });
 			}
 		}
 	},

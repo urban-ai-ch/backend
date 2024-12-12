@@ -20,6 +20,7 @@
 	"dependencies": {
 		"@types/mimetext": "^2.0.4",
 		"mimetext": "^3.0.24",
-		"replicate": "^1.0.1"
+		"replicate": "^1.0.1",
+		"stripe": "^17.4.0"
 	}
 }

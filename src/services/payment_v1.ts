@@ -49,7 +49,7 @@ const service: Service = {
 								},
 							},
 							quantity: 10,
-							adjustable_quantity: { enabled: true, minimum: 10 },
+							adjustable_quantity: { enabled: true, minimum: 10, maximum: 999999 },
 						},
 					],
 					metadata: {

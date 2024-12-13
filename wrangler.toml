@@ -27,3 +27,6 @@ allowed_destination_addresses = ["noahgerber100@gmail.com", "saimaneesh14@gmail.
 binding = "DB"
 database_name = "webdev-hs24-database"
 database_id = "058eeb89-06be-41dd-80a0-32882d43c089"
+
+[ai]
+binding = "AI"

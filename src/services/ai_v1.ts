@@ -8,6 +8,11 @@ type DetectionPayload = {
 	imageName: string;
 };
 
+export type GroundingSamInput = {
+	image_url: string;
+	labels: string[];
+};
+
 const service: Service = {
 	path: '/ai/v1/',
 
@@ -17,26 +22,24 @@ const service: Service = {
 
 		const replicate = new Replicate({
 			auth: env.REPLICATE_API_TOKEN,
+			useFileOutput: false,
 		});
 
 		switch (request.method + ' ' + subPath.split('/')[0]) {
-			case 'GET detection': {
+			case 'POST detection': {
 				const payload = await request.json<DetectionPayload>();
 
-				const imgUrl = getImageURL(request.url, payload.imageName);
+				const input: GroundingSamInput = {
+					image_url: getImageURL(request.url, payload.imageName),
+					labels: ['house facade'],
+				};
 
-				const output = await replicate.run(
-					'gerbernoah/grounding-dino-fork:4f5d21fed8f0a1a84f53f563f9748e069d2fa286dbd09e4e148a0b15ca871695',
-					{
-						input: {
-							image: imgUrl,
-							query: 'house facade',
-							box_threshold: 0.25,
-							text_threshold: 0.25,
-							show_visualisation: true,
-						},
-					},
-				);
+				const output = await replicate.run('gerbernoah/grounding-sam', {
+					input,
+					wait: { mode: 'poll' },
+					webhook: `https://${new URL(request.url).host}/webhooks/v1/replicate`,
+					webhook_events_filter: ['output'],
+				});
 
 				console.log(output);
 				return new Response(JSON.stringify(output), { status: 200 });

@@ -1,8 +1,17 @@
 import Stripe from 'stripe';
 import { Service } from '..';
-import { authenticateToken } from './auth_v1';
+import { GroundingSamInput } from './ai_v1';
+import { FileOutput } from 'replicate';
 
-export const sumItemsByName = async (
+type ReplicatePrediction<I> = {
+	id: string;
+	input: I;
+	output: string;
+	status: string;
+	metrics: any;
+};
+
+export const stripeSumItemsByName = async (
 	lineItems: Stripe.ApiList<Stripe.LineItem>,
 	name: string,
 	stripe: Stripe,
@@ -21,7 +30,7 @@ export const sumItemsByName = async (
 
 	return lineItems.has_more
 		? totalAmount +
-				(await sumItemsByName(
+				(await stripeSumItemsByName(
 					await stripe.checkout.sessions.listLineItems('session_id', {
 						starting_after: lineItems.data[lineItems.data.length - 1].id,
 					}),
@@ -53,7 +62,7 @@ const service: Service = {
 						}
 
 						const username = paymentIntent.metadata['username'];
-						const quantity = await sumItemsByName(paymentIntent.line_items, 'Token', stripe);
+						const quantity = await stripeSumItemsByName(paymentIntent.line_items, 'Token', stripe);
 
 						const tokensResult = await env.DB.prepare(
 							`SELECT token_count
@@ -77,6 +86,26 @@ const service: Service = {
 					default:
 						console.log(`Unhandled event type ${event.type}`);
 				}
+			}
+			case 'POST replicate': {
+				const prediction = await request.json<ReplicatePrediction<GroundingSamInput>>();
+				const url = prediction.output;
+
+				console.log(url);
+
+				const image = await (await fetch(url)).arrayBuffer();
+
+				const imageData = image instanceof ArrayBuffer ? new Uint8Array(image) : new Uint8Array(image.buffer);
+
+				const input = {
+					image: [...imageData],
+					prompt: 'Give me the material of this image',
+					max_tokens: 512,
+				};
+				const response = await env.AI.run('@cf/unum/uform-gen2-qwen-500m', input);
+
+				console.log(response.description);
+				return new Response('Result received', { status: 200 });
 			}
 		}
 	},

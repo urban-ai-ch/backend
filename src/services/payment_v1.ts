@@ -1,8 +1,8 @@
-import { FRONTEND_URL, Service } from '..';
+import { Service } from '..';
 import { authenticateToken } from './auth_v1';
 
 import Stripe from 'stripe';
-import { sumItemsByName } from './webhooks_v1';
+import { stripeSumItemsByName } from './webhooks_v1';
 
 type OrderResponse = {
 	clientSecret: string;
@@ -75,7 +75,7 @@ const service: Service = {
 						return new Response('Fields missing', { status: 400 });
 					}
 
-					const quantity = await sumItemsByName(session.line_items, 'Token', stripe);
+					const quantity = await stripeSumItemsByName(session.line_items, 'Token', stripe);
 
 					const response: SessionStatusResponse = {
 						status: session.status,

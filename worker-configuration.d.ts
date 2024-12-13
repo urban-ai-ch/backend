@@ -9,4 +9,5 @@ interface Env {
 	GEOSJON_BUCKET: R2Bucket;
 	DB: D1Database;
 	EMAIL_BINDING: SendEmail;
+	AI: Ai;
 }

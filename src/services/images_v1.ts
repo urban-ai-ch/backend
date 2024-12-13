@@ -56,19 +56,19 @@ const service: Service = {
 
 				const fileResponses = await Promise.all(filePromises);
 
+				let status;
 				const responses = await Promise.all(
-					fileResponses.map((response) =>
-						response instanceof Response
-							? response.text().then((text) => ({ text, status: response.status }))
-							: response,
-					),
+					fileResponses.map((response) => {
+						if (response instanceof Response) {
+							status = 400;
+							return response.text().then((text) => ({ text, status: response.status }));
+						}
+						status = 200;
+						return response;
+					}),
 				);
 
-				if (responses.length > 0) {
-					return new Response(JSON.stringify(responses), { status: 400 });
-				} else {
-					return new Response(JSON.stringify(fileResponses), { status: 200 });
-				}
+				return new Response(JSON.stringify(responses), { status });
 			}
 			case 'GET image': {
 				const cache = caches.default;

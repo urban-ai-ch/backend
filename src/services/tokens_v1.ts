@@ -8,7 +8,7 @@ type TokenResponse = {
 const service: Service = {
 	path: '/tokens/v1/',
 
-	fetch: async (request: Request, subPath: string, env: Env): Promise<Response | void> => {
+	fetch: async (request: Request, env: Env, ctx: ExecutionContext, subPath: string): Promise<Response | void> => {
 		const authContext = await authenticateToken(request.headers, env);
 		if (authContext instanceof Response) return authContext;
 

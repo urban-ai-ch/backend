@@ -16,7 +16,7 @@ export type GroundingSamInput = {
 const service: Service = {
 	path: '/ai/v1/',
 
-	fetch: async (request: Request, subPath: string, env: Env): Promise<Response | void> => {
+	fetch: async (request: Request, env: Env, ctx: ExecutionContext, subPath: string): Promise<Response | void> => {
 		const authContext = await authenticateToken(request.headers, env);
 		if (authContext instanceof Response) return authContext;
 
@@ -34,15 +34,17 @@ const service: Service = {
 					labels: ['house facade'],
 				};
 
-				const output = await replicate.run('gerbernoah/grounding-sam', {
-					input,
-					wait: { mode: 'poll' },
-					webhook: `https://${new URL(request.url).host}/webhooks/v1/replicate`,
-					webhook_events_filter: ['output'],
-				});
+				const replicatePromise = replicate
+					.run('gerbernoah/grounding-sam:9cea0b079b1892a3c05d052d043fca45483ff55bbebfeed2fa0c20cc6a9a69e7', {
+						input,
+						webhook: `https://${new URL(request.url).host}/webhooks/v1/replicate`,
+						webhook_events_filter: ['output'],
+					})
+					.then(() => console.log('fiinished'));
 
-				console.log(output);
-				return new Response(JSON.stringify(output), { status: 200 });
+				ctx.waitUntil(replicatePromise);
+
+				return new Response('Job queued', { status: 200 });
 			}
 		}
 	},

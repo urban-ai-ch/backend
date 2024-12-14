@@ -15,7 +15,7 @@ type UserPayload = {
 const service: Service = {
 	path: '/users/v1/',
 
-	fetch: async (request: Request, subPath: string, env: Env): Promise<Response | void> => {
+	fetch: async (request: Request, env: Env, ctx: ExecutionContext, subPath: string): Promise<Response | void> => {
 		const authContext = await authenticateToken(request.headers, env);
 
 		switch (request.method + ' ' + subPath.split('/')[0]) {

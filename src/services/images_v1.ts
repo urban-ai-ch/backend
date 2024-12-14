@@ -13,7 +13,7 @@ export const getImageURL = (url: string, imageName: string): string => {
 const service: Service = {
 	path: '/images/v1/',
 
-	fetch: async (request: Request, subPath: string, env: Env): Promise<Response | void> => {
+	fetch: async (request: Request, env: Env, ctx: ExecutionContext, subPath: string): Promise<Response | void> => {
 		const authContext = await authenticateToken(request.headers, env);
 
 		const args = subPath.split('/');

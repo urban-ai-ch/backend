@@ -4,7 +4,7 @@ export const FRONTEND_URL = 'https://urban-ai.ch';
 
 export interface Service {
 	path: string;
-	fetch(request: Request, subPath: string, env: Env): Promise<Response | void>;
+	fetch(request: Request, env: Env, ctx: ExecutionContext, subPath: string): Promise<Response | void>;
 }
 
 export default {
@@ -29,7 +29,7 @@ export default {
 			const foundService = Object.values(services).filter((service: Service) => service.path === servicePath)[0];
 
 			if (foundService) {
-				const serviceResponse = await foundService.fetch(request, subPath, env);
+				const serviceResponse = await foundService.fetch(request, env, ctx, subPath);
 
 				if (serviceResponse) {
 					serviceResponse.headers.set('Access-Control-Allow-Origin', '*'); // TODO: update in production

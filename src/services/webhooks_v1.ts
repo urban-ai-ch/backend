@@ -43,7 +43,7 @@ export const stripeSumItemsByName = async (
 const service: Service = {
 	path: '/webhooks/v1/',
 
-	fetch: async (request: Request, subPath: string, env: Env): Promise<Response | void> => {
+	fetch: async (request: Request, env: Env, ctx: ExecutionContext, subPath: string): Promise<Response | void> => {
 		switch (request.method + ' ' + subPath.split('/')[0]) {
 			case 'GET stripe': {
 				const event = await request.json<Stripe.Event>();
@@ -95,16 +95,17 @@ const service: Service = {
 
 				const image = await (await fetch(url)).arrayBuffer();
 
-				const imageData = image instanceof ArrayBuffer ? new Uint8Array(image) : new Uint8Array(image.buffer);
-
 				const input = {
-					image: [...imageData],
+					image: [...new Uint8Array(image)],
 					prompt: 'Give me the material of this image',
-					max_tokens: 512,
+					max_tokens: 20,
 				};
-				const response = await env.AI.run('@cf/unum/uform-gen2-qwen-500m', input);
+				const aiPromise = env.AI.run('@cf/unum/uform-gen2-qwen-500m', input).then((response) =>
+					console.log(response.description),
+				);
 
-				console.log(response.description);
+				ctx.waitUntil(aiPromise);
+
 				return new Response('Result received', { status: 200 });
 			}
 		}

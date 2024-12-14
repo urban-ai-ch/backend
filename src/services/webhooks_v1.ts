@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import { Service } from '..';
 import { GroundingSamInput } from './ai_v1';
 import { createHmacSha256 } from '../auth';
+import Replicate from 'replicate';
 
 type ReplicatePrediction<I> = {
 	id: string;
@@ -92,7 +93,7 @@ const service: Service = {
 				}
 			}
 			case 'POST replicate': {
-				const validationURL = 'https://api.replicate.com/v1/webhooks/default/secret';
+				const replicate = new Replicate({ auth: env.REPLICATE_API_TOKEN });
 
 				const webhook_id = request.headers.get('webhook-id');
 				const webhook_timestamp = request.headers.get('webhook-timestamp');
@@ -100,23 +101,25 @@ const service: Service = {
 
 				if (!webhook_signature) return new Response('webhook-signature header missing', { status: 400 });
 
-				const signedContent = `${webhook_id}.${webhook_timestamp}.${request.body}`;
+				const body = await request.text();
 
-				const cacheKey = new Request(validationURL);
+				const signedContent = `${webhook_id}.${webhook_timestamp}.${body}`;
+
+				const cacheKey = new Request('https://urban-ai.ch');
 				cacheKey.headers.set('If-Modified-Since', new Date(Date.now() + 600000).toUTCString());
-				const cachedResponse = await caches.default.match(cacheKey);
 
-				let response;
-				if (cachedResponse) {
-					response = cachedResponse;
+				const response = await caches.default.match(cacheKey);
+				let key = await response?.text();
+
+				if (!key) {
+					key = (await replicate.webhooks.default.secret.get()).key;
+					caches.default.put(cacheKey, new Response(key));
+					console.log('uncached key:');
 				} else {
-					response = await fetch(validationURL);
-
-					caches.default.put(cacheKey, response);
+					console.log('cached key:');
 				}
 
-				const secret = (await response.json<ReplicateCacheSecret>()).key;
-				const signature = await createHmacSha256(secret, signedContent);
+				const signature = await createHmacSha256(key, signedContent);
 
 				const isValid = webhook_signature
 					.split(' ')
@@ -125,7 +128,7 @@ const service: Service = {
 
 				if (!isValid) return new Response('Webhook corrupted', { status: 401 });
 
-				const prediction = await request.json<ReplicatePrediction<GroundingSamInput>>();
+				const prediction: ReplicatePrediction<GroundingSamInput> = await JSON.parse(body);
 				const url = prediction.output;
 
 				console.log(url);
@@ -138,9 +141,21 @@ const service: Service = {
 						'List only the main building materials used in the construction of the building in the image. No filler words, just the materials',
 					max_tokens: 20,
 				};
-				const aiPromise = env.AI.run('@cf/unum/uform-gen2-qwen-500m', input).then((response) =>
-					console.log(response.description),
-				);
+				const aiPromise = env.AI.run('@cf/unum/uform-gen2-qwen-500m', input).then(async (response) => {
+					console.log(response.description);
+
+					const original_image_name = new URL(request.url).searchParams.get('original_image_name');
+					if (!original_image_name) return new Response('Original image name missing');
+
+					const original = await (await env.IMAGES_BUCKET.get(original_image_name))?.blob();
+					if (!original) return new Response('Original Image not found');
+
+					await env.IMAGES_BUCKET.put(original_image_name, original, {
+						customMetadata: {
+							materials: response.description,
+						},
+					});
+				});
 
 				ctx.waitUntil(aiPromise);
 

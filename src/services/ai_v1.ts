@@ -37,7 +37,7 @@ const service: Service = {
 				const replicatePromise = replicate
 					.run('gerbernoah/grounding-sam:9cea0b079b1892a3c05d052d043fca45483ff55bbebfeed2fa0c20cc6a9a69e7', {
 						input,
-						webhook: `https://${new URL(request.url).host}/webhooks/v1/replicate`,
+						webhook: `https://${new URL(request.url).host}/webhooks/v1/replicate?original_image_name=${payload.imageName}`,
 						webhook_events_filter: ['output'],
 					})
 					.then(() => console.log('fiinished'));

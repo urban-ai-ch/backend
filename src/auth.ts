@@ -82,3 +82,17 @@ export async function hash(payload: string): Promise<string> {
 
 	return new TextDecoder().decode(digest);
 }
+
+export async function createHmacSha256(secret: string, signedContent: string): Promise<string> {
+	const encoder = new TextEncoder();
+	const secretBuffer = encoder.encode(secret);
+	const contentBuffer = encoder.encode(signedContent);
+
+	const key = await crypto.subtle.importKey('raw', secretBuffer, { name: 'HMAC', hash: { name: 'SHA-256' } }, false, [
+		'sign',
+	]);
+
+	const signatureBuffer = await crypto.subtle.sign('HMAC', key, contentBuffer);
+
+	return btoa(String.fromCharCode(...new Uint8Array(signatureBuffer)));
+}

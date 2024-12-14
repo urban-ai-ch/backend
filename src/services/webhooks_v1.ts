@@ -1,7 +1,7 @@
 import Stripe from 'stripe';
 import { Service } from '..';
 import { GroundingSamInput } from './ai_v1';
-import { FileOutput } from 'replicate';
+import { createHmacSha256 } from '../auth';
 
 type ReplicatePrediction<I> = {
 	id: string;
@@ -9,6 +9,10 @@ type ReplicatePrediction<I> = {
 	output: string;
 	status: string;
 	metrics: any;
+};
+
+type ReplicateCacheSecret = {
+	key: string;
 };
 
 export const stripeSumItemsByName = async (
@@ -88,6 +92,39 @@ const service: Service = {
 				}
 			}
 			case 'POST replicate': {
+				const validationURL = 'https://api.replicate.com/v1/webhooks/default/secret';
+
+				const webhook_id = request.headers.get('webhook-id');
+				const webhook_timestamp = request.headers.get('webhook-timestamp');
+				const webhook_signature = request.headers.get('webhook-signature');
+
+				if (!webhook_signature) return new Response('webhook-signature header missing', { status: 400 });
+
+				const signedContent = `${webhook_id}.${webhook_timestamp}.${request.body}`;
+
+				const cacheKey = new Request(validationURL);
+				cacheKey.headers.set('If-Modified-Since', new Date(Date.now() + 600000).toUTCString());
+				const cachedResponse = await caches.default.match(cacheKey);
+
+				let response;
+				if (cachedResponse) {
+					response = cachedResponse;
+				} else {
+					response = await fetch(validationURL);
+
+					caches.default.put(cacheKey, response);
+				}
+
+				const secret = (await response.json<ReplicateCacheSecret>()).key;
+				const signature = await createHmacSha256(secret, signedContent);
+
+				const isValid = webhook_signature
+					.split(' ')
+					.map((sig) => sig.split(',')[1])
+					.some((webhook_signature) => webhook_signature === signature);
+
+				if (!isValid) return new Response('Webhook corrupted', { status: 401 });
+
 				const prediction = await request.json<ReplicatePrediction<GroundingSamInput>>();
 				const url = prediction.output;
 
@@ -97,7 +134,8 @@ const service: Service = {
 
 				const input = {
 					image: [...new Uint8Array(image)],
-					prompt: 'Give me the material of this image',
+					prompt:
+						'List only the main building materials used in the construction of the building in the image. No filler words, just the materials',
 					max_tokens: 20,
 				};
 				const aiPromise = env.AI.run('@cf/unum/uform-gen2-qwen-500m', input).then((response) =>

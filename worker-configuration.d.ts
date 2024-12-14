@@ -5,6 +5,7 @@ interface Env {
 	JWT_SECRET: string;
 	REPLICATE_API_TOKEN: string;
 	STRIPE_PRIVATE_KEY: string;
+	STRIPE_WEBHOOK_SIGNING_KEY: string;
 	IMAGES_BUCKET: R2Bucket;
 	GEOSJON_BUCKET: R2Bucket;
 	DB: D1Database;

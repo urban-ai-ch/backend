@@ -1,8 +1,7 @@
 import Stripe from 'stripe';
 import { Service } from '..';
 import { GroundingSamInput } from './ai_v1';
-import { createHmacSha256 } from '../auth';
-import Replicate from 'replicate';
+import Replicate, { validateWebhook } from 'replicate';
 
 type ReplicatePrediction<I> = {
 	id: string;
@@ -10,10 +9,6 @@ type ReplicatePrediction<I> = {
 	output: string;
 	status: string;
 	metrics: any;
-};
-
-type ReplicateCacheSecret = {
-	key: string;
 };
 
 export const stripeSumItemsByName = async (
@@ -95,40 +90,25 @@ const service: Service = {
 			case 'POST replicate': {
 				const replicate = new Replicate({ auth: env.REPLICATE_API_TOKEN });
 
-				const webhook_id = request.headers.get('webhook-id');
-				const webhook_timestamp = request.headers.get('webhook-timestamp');
-				const webhook_signature = request.headers.get('webhook-signature');
-
-				if (!webhook_signature) return new Response('webhook-signature header missing', { status: 400 });
-
-				const body = await request.text();
-
-				const signedContent = `${webhook_id}.${webhook_timestamp}.${body}`;
-
 				const cacheKey = new Request('https://urban-ai.ch');
 				cacheKey.headers.set('If-Modified-Since', new Date(Date.now() + 600000).toUTCString());
 
-				const response = await caches.default.match(cacheKey);
-				let key = await response?.text();
+				const keyResponse = await caches.default.match(cacheKey);
+				let validationKey = await keyResponse?.text();
 
-				if (!key) {
-					key = (await replicate.webhooks.default.secret.get()).key;
-					caches.default.put(cacheKey, new Response(key));
-					console.log('uncached key:');
+				if (!validationKey) {
+					validationKey = (await replicate.webhooks.default.secret.get()).key;
+					caches.default.put(cacheKey, new Response(validationKey));
+					console.log('uncached key');
 				} else {
-					console.log('cached key:');
+					console.log('cached key');
 				}
 
-				const signature = await createHmacSha256(key, signedContent);
-
-				const isValid = webhook_signature
-					.split(' ')
-					.map((sig) => sig.split(',')[1])
-					.some((webhook_signature) => webhook_signature === signature);
+				const isValid = await validateWebhook(request.clone(), validationKey);
 
 				if (!isValid) return new Response('Webhook corrupted', { status: 401 });
 
-				const prediction: ReplicatePrediction<GroundingSamInput> = await JSON.parse(body);
+				const prediction = await request.json<ReplicatePrediction<GroundingSamInput>>();
 				const url = prediction.output;
 
 				console.log(url);

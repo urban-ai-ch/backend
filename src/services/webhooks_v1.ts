@@ -122,7 +122,9 @@ const service: Service = {
 						'List only the main building materials used in the construction of the building in the image. No filler words, just the materials',
 					max_tokens: 20,
 				};
-				const aiPromise = env.AI.run('@cf/unum/uform-gen2-qwen-500m', input).then(async (response) => {
+				const aiPromise = env.AI.run('@cf/unum/uform-gen2-qwen-500m', input, {
+					gateway: { id: 'webdev-hs24', collectLog: true },
+				}).then(async (response) => {
 					console.log(response.description);
 
 					const original_image_name = new URL(request.url).searchParams.get('original_image_name');

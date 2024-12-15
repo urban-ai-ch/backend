@@ -56,7 +56,7 @@ const service: Service = {
 						body: JSON.stringify(replicateBody),
 						headers,
 					},
-				).then(() => console.log('fiinished'));
+				);
 
 				ctx.waitUntil(replicatePromise);
 

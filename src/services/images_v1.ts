@@ -36,7 +36,6 @@ const service: Service = {
 					}
 
 					if (file.size > MAX_SIZE) {
-						console.log('file size exeeded');
 						return new Response('File size exceeds 2MB limit', { status: 413 });
 					}
 

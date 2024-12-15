@@ -85,7 +85,7 @@ const service: Service = {
 
 						return new Response(`Added ${quantity} tokens`, { status: 200 });
 					default:
-						console.log(`Unhandled event type ${event.type}`);
+						return;
 				}
 			}
 			case 'POST replicate': {
@@ -100,9 +100,6 @@ const service: Service = {
 				if (!wHVKey) {
 					wHVKey = (await replicate.webhooks.default.secret.get()).key;
 					caches.default.put(webHookCacheKey, new Response(wHVKey));
-					console.log('uncached key');
-				} else {
-					console.log('cached key');
 				}
 
 				const isValid = await validateWebhook(request.clone(), wHVKey);
@@ -112,7 +109,7 @@ const service: Service = {
 				const prediction = await request.json<ReplicatePrediction<GroundingSamInput>>();
 				const url = prediction.output;
 
-				console.log(url);
+				console.log('Grounding-sam result: ' + url);
 
 				const image = await (await fetch(url)).arrayBuffer();
 
@@ -130,7 +127,7 @@ const service: Service = {
 					extraHeaders: headers,
 					gateway: { id: 'webdev-hs24', collectLog: true },
 				}).then(async (response) => {
-					console.log(response.description);
+					console.log('LLM result: ' + response.description);
 
 					const original_image_name = new URL(request.url).searchParams.get('original_image_name');
 					if (!original_image_name) return new Response('Original image name missing');

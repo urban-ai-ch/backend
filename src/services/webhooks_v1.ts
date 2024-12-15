@@ -91,21 +91,21 @@ const service: Service = {
 			case 'POST replicate': {
 				const replicate = new Replicate({ auth: env.REPLICATE_API_TOKEN });
 
-				const cacheKey = new Request('https://urban-ai.ch');
-				cacheKey.headers.set('If-Modified-Since', new Date(Date.now() + 600000).toUTCString());
+				const webHookCacheKey = new Request('https://urban-ai.ch');
+				webHookCacheKey.headers.set('If-Modified-Since', new Date(Date.now() - 600000).toUTCString());
 
-				const keyResponse = await caches.default.match(cacheKey);
-				let validationKey = await keyResponse?.text();
+				const keyResponse = await caches.default.match(webHookCacheKey);
+				let wHVKey = await keyResponse?.text();
 
-				if (!validationKey) {
-					validationKey = (await replicate.webhooks.default.secret.get()).key;
-					caches.default.put(cacheKey, new Response(validationKey));
+				if (!wHVKey) {
+					wHVKey = (await replicate.webhooks.default.secret.get()).key;
+					caches.default.put(webHookCacheKey, new Response(wHVKey));
 					console.log('uncached key');
 				} else {
 					console.log('cached key');
 				}
 
-				const isValid = await validateWebhook(request.clone(), validationKey);
+				const isValid = await validateWebhook(request.clone(), wHVKey);
 
 				if (!isValid) return new Response('Webhook corrupted', { status: 401 });
 

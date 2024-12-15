@@ -45,12 +45,12 @@ const service: Service = {
 				headers.set('Content-Type', 'application/json');
 
 				const model_owner = 'gerbernoah';
-				const model_name = 'grounding-sam';
+				const deployment_name = 'urban-ai-grounding-sam';
 				const cloudflareAccountID = '5b90fdf2bc4e39874b024b2bc8cd5d13';
 				const gatewayID = 'webdev-hs24';
 
 				const replicatePromise = fetch(
-					`https://gateway.ai.cloudflare.com/v1/${cloudflareAccountID}/${gatewayID}/replicate/models/${model_owner}/${model_name}/predictions`,
+					`https://gateway.ai.cloudflare.com/v1/${cloudflareAccountID}/${gatewayID}/replicate/deployments/${model_owner}/${deployment_name}/predictions`,
 					{
 						method: 'POST',
 						body: JSON.stringify(replicateBody),

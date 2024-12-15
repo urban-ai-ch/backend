@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import { Service } from '..';
 import { GroundingSamInput } from './ai_v1';
 import Replicate, { validateWebhook } from 'replicate';
+import { getImageURL } from './images_v1';
 
 type ReplicatePrediction<I> = {
 	id: string;
@@ -135,6 +136,8 @@ const service: Service = {
 							materials: response.description,
 						},
 					});
+
+					await caches.default.delete(getImageURL(request.url, original_image_name));
 				});
 
 				ctx.waitUntil(aiPromise);

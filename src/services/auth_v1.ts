@@ -16,10 +16,6 @@ type AuthTokenResponse = {
 	token: string;
 };
 
-type AuthResponse = {
-	authenticated: boolean;
-};
-
 export type JWTPayload = {
 	iat: number;
 	jti: string;
@@ -65,11 +61,8 @@ const service: Service = {
 				return new Response(JSON.stringify(response), { status: 200 });
 			}
 			case 'GET auth': {
-				const response: AuthResponse = {
-					authenticated: authContext instanceof Response,
-				};
-
-				return new Response(JSON.stringify(response), { status: 200 });
+				if (authContext instanceof Response) return authContext;
+				return new Response('Authenticated', { status: 200 });
 			}
 		}
 	},

@@ -34,20 +34,32 @@ const service: Service = {
 					labels: ['house facade'],
 				};
 
-				const original = await (await env.IMAGES_BUCKET.get(payload.imageName))?.blob();
+				const original = await env.IMAGES_BUCKET.get(payload.imageName);
 				if (!original) return new Response('Original Image not found');
 
-				let metaData: ImageMetaData = {};
+				console.log(original.customMetadata);
+				const metaData: ImageMetaData = {
+					materials: original.customMetadata?.materials,
+					history: original.customMetadata?.history,
+					seismic: original.customMetadata?.seismic,
+				};
+
 				metaData[payload.criteria] = 'Processing';
 
-				const imageBucketPromise = env.IMAGES_BUCKET.put(payload.imageName, original, {
+				console.log(metaData);
+
+				await env.IMAGES_BUCKET.put(payload.imageName, await original.blob(), {
 					customMetadata: metaData,
 				});
-				const cacheDeletePromise = caches.default.delete(getImageMetaURL(request.url, payload.imageName));
+				await caches.default.delete(getImageMetaURL(request.url, payload.imageName));
+
+				const webhookUrl = new URL(`https://${new URL(request.url).host}/webhooks/v1/replicate`);
+				webhookUrl.searchParams.set('original_image_name', payload.imageName);
+				webhookUrl.searchParams.set('criteria', payload.criteria);
 
 				const replicateBody: ReplicatePayload = {
 					input: input,
-					webhook: `https://${new URL(request.url).host}/webhooks/v1/replicate?original_image_name=${payload.imageName}`,
+					webhook: webhookUrl.toString(),
 					webhook_events_filter: ['output'],
 				};
 
@@ -55,22 +67,22 @@ const service: Service = {
 				headers.set('Authorization', `Bearer ${env.REPLICATE_API_TOKEN}`);
 				headers.set('cf-aig-authorization', `Bearer ${env.AI_GATEWAY_TOKEN}`);
 				headers.set('Content-Type', 'application/json');
+				headers.set('cf-aig-skip-cache', 'true');
 
 				const model_owner = 'gerbernoah';
 				const deployment_name = 'urban-ai-grounding-sam';
 				const cloudflareAccountID = '5b90fdf2bc4e39874b024b2bc8cd5d13';
 				const gatewayID = 'webdev-hs24';
 
-				const replicatePromise = fetch(
-					`https://gateway.ai.cloudflare.com/v1/${cloudflareAccountID}/${gatewayID}/replicate/deployments/${model_owner}/${deployment_name}/predictions`,
-					{
-						method: 'POST',
-						body: JSON.stringify(replicateBody),
-						headers,
-					},
-				);
+				const replicateURL = `https://gateway.ai.cloudflare.com/v1/${cloudflareAccountID}/${gatewayID}/replicate/deployments/${model_owner}/${deployment_name}/predictions`;
 
-				ctx.waitUntil(Promise.allSettled([replicatePromise, imageBucketPromise, cacheDeletePromise]));
+				const replicatePromise = fetch(replicateURL, {
+					method: 'POST',
+					body: JSON.stringify(replicateBody),
+					headers,
+				});
+
+				ctx.waitUntil(Promise.allSettled([replicatePromise]));
 
 				return new Response('Job queued', { status: 200 });
 			}

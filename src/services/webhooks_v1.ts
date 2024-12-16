@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 import { Service } from '..';
 import { GroundingSamInput } from './ai_v1';
 import Replicate, { validateWebhook } from 'replicate';
-import { getImageMetaURL, getImageURL, ImageMetaData } from './images_v1';
+import { Criteria, getImageMetaURL, getImageURL, ImageMetaData } from './images_v1';
 
 type ReplicatePrediction<I> = {
 	id: string;
@@ -10,6 +10,10 @@ type ReplicatePrediction<I> = {
 	output: string;
 	status: string;
 	metrics: any;
+};
+
+type AiInput = {
+	[key in Criteria]?: string;
 };
 
 export const stripeSumItemsByName = async (
@@ -113,10 +117,26 @@ const service: Service = {
 
 				const image = await (await fetch(url)).arrayBuffer();
 
+				console.log(new URL(request.url).searchParams.get('criteria'));
+				const criteria = new URL(request.url).searchParams.get('criteria') as Criteria;
+				console.log(criteria);
+				const aiInput: AiInput = {
+					materials:
+						'List only the main building materials used in the construction of the building in the image. No filler words, just the materials',
+					history: 'Provide a brief history of this building, including its construction date',
+					seismic: "What's the seismic risk of this building",
+				};
+
+				const prompt = aiInput[criteria];
+
+				if (!prompt) {
+					console.log('Criteria not found');
+					return new Response('Criteria not found', { status: 400 });
+				}
+
 				const input = {
 					image: [...new Uint8Array(image)],
-					prompt:
-						'List only the main building materials used in the construction of the building in the image. No filler words, just the materials',
+					prompt: aiInput[criteria],
 					max_tokens: 20,
 				};
 
@@ -132,13 +152,18 @@ const service: Service = {
 					const original_image_name = new URL(request.url).searchParams.get('original_image_name');
 					if (!original_image_name) return new Response('Original image name missing');
 
-					const original = await (await env.IMAGES_BUCKET.get(original_image_name))?.blob();
+					const original = await env.IMAGES_BUCKET.get(original_image_name);
 					if (!original) return new Response('Original Image not found');
 
-					const metaData: ImageMetaData = {
-						materials: response.description,
+					let metaData: ImageMetaData = {
+						history: original.customMetadata?.history,
+						materials: original.customMetadata?.materials,
+						seismic: original.customMetadata?.seismic,
 					};
-					const imageBucketPromise = env.IMAGES_BUCKET.put(original_image_name, original, {
+
+					metaData[criteria] = response.description;
+
+					const imageBucketPromise = env.IMAGES_BUCKET.put(original_image_name, await original.blob(), {
 						customMetadata: metaData,
 					});
 					const cacheDeleteMetaPromise = caches.default.delete(getImageMetaURL(request.url, original_image_name));

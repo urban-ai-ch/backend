@@ -120,6 +120,8 @@ const service: Service = {
 
 					const metaData: ImageMetaData = {
 						materials: image.customMetadata?.materials,
+						history: image.customMetadata?.history,
+						seismic: image.customMetadata?.seismic,
 					};
 
 					response = new Response(JSON.stringify(metaData), { status: 200 });

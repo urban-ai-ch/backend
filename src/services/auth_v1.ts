@@ -55,7 +55,7 @@ const service: Service = {
 				if (user.password !== (await hash(password))) return new Response('Invalid password', { status: 400 });
 
 				const payload: JWTPayload = { iat: Date.now(), jti: crypto.randomUUID(), username };
-				const token = await signJWT(payload, env.JWT_SECRET, 3600); // Type for the payload is inferred
+				const token = await signJWT(payload, env.JWT_SECRET, 24 * 60 * 60);
 
 				const response: AuthTokenResponse = { token };
 				return new Response(JSON.stringify(response), { status: 200 });

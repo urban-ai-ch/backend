@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 import { Service } from '..';
 import { GroundingSamInput } from './ai_v1';
 import Replicate, { validateWebhook } from 'replicate';
-import { getImageURL } from './images_v1';
+import { getImageURL, ImageMetaData } from './images_v1';
 
 type ReplicatePrediction<I> = {
 	id: string;
@@ -135,10 +135,11 @@ const service: Service = {
 					const original = await (await env.IMAGES_BUCKET.get(original_image_name))?.blob();
 					if (!original) return new Response('Original Image not found');
 
+					const metaData: ImageMetaData = {
+						materials: response.description,
+					};
 					await env.IMAGES_BUCKET.put(original_image_name, original, {
-						customMetadata: {
-							materials: response.description,
-						},
+						customMetadata: metaData,
 					});
 
 					await caches.default.delete(getImageURL(request.url, original_image_name));

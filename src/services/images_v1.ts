@@ -6,6 +6,10 @@ type ImageObject = {
 	href: string;
 };
 
+export type ImageMetaData = {
+	materials?: string;
+};
+
 export const getImageURL = (url: string, imageName: string): string => {
 	return `https://${new URL(url).host}/images/v1/image/${imageName}`;
 };
@@ -91,6 +95,34 @@ const service: Service = {
 
 				const headers = new Headers(response.headers);
 				headers.set('Cache-Control', 'private, max-age=31536000'); //1 year caching
+
+				return new Response(response.body, {
+					status: response.status,
+					headers: headers,
+				});
+			}
+			case 'GET metadata': {
+				const cache = caches.default;
+				let response = await cache.match(request.url);
+
+				if (!response) {
+					const imageName = args[1];
+					const image = await env.IMAGES_BUCKET.get(imageName);
+
+					if (!image) {
+						return new Response('Image not found');
+					}
+
+					const metaData: ImageMetaData = {
+						materials: image.customMetadata?.materials,
+					};
+
+					response = new Response(JSON.stringify(metaData), { status: 200 });
+					await cache.put(request.url, response.clone());
+				}
+
+				const headers = new Headers(response.headers);
+				headers.set('Cache-Control', 'private, max-age=3600'); //1 hour caching
 
 				return new Response(response.body, {
 					status: response.status,

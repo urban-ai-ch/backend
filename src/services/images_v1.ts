@@ -6,12 +6,17 @@ type ImageObject = {
 	href: string;
 };
 
+export type Criteria = 'materials' | 'history' | 'seismic';
 export type ImageMetaData = {
-	materials?: string;
+	[key in Criteria]?: string;
 };
 
 export const getImageURL = (url: string, imageName: string): string => {
 	return `https://${new URL(url).host}/images/v1/image/${imageName}`;
+};
+
+export const getImageMetaURL = (url: string, imageName: string): string => {
+	return `https://${new URL(url).host}/images/v1/metadata/${imageName}`;
 };
 
 const service: Service = {

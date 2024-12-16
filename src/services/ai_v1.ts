@@ -1,9 +1,10 @@
 import { Service } from '..';
 import { authenticateToken } from './auth_v1';
-import { getImageURL } from './images_v1';
+import { Criteria, getImageMetaURL, getImageURL, ImageMetaData } from './images_v1';
 
 type DetectionPayload = {
 	imageName: string;
+	criteria: Criteria;
 };
 
 export type GroundingSamInput = {
@@ -33,6 +34,17 @@ const service: Service = {
 					labels: ['house facade'],
 				};
 
+				const original = await (await env.IMAGES_BUCKET.get(payload.imageName))?.blob();
+				if (!original) return new Response('Original Image not found');
+
+				let metaData: ImageMetaData = {};
+				metaData[payload.criteria] = 'Processing';
+
+				const imageBucketPromise = env.IMAGES_BUCKET.put(payload.imageName, original, {
+					customMetadata: metaData,
+				});
+				const cacheDeletePromise = caches.default.delete(getImageMetaURL(request.url, payload.imageName));
+
 				const replicateBody: ReplicatePayload = {
 					input: input,
 					webhook: `https://${new URL(request.url).host}/webhooks/v1/replicate?original_image_name=${payload.imageName}`,
@@ -58,7 +70,7 @@ const service: Service = {
 					},
 				);
 
-				ctx.waitUntil(replicatePromise);
+				ctx.waitUntil(Promise.allSettled([replicatePromise, imageBucketPromise, cacheDeletePromise]));
 
 				return new Response('Job queued', { status: 200 });
 			}

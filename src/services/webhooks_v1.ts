@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 import { Service } from '..';
 import { GroundingSamInput } from './ai_v1';
 import Replicate, { validateWebhook } from 'replicate';
-import { getImageURL, ImageMetaData } from './images_v1';
+import { getImageMetaURL, getImageURL, ImageMetaData } from './images_v1';
 
 type ReplicatePrediction<I> = {
 	id: string;
@@ -138,11 +138,13 @@ const service: Service = {
 					const metaData: ImageMetaData = {
 						materials: response.description,
 					};
-					await env.IMAGES_BUCKET.put(original_image_name, original, {
+					const imageBucketPromise = env.IMAGES_BUCKET.put(original_image_name, original, {
 						customMetadata: metaData,
 					});
+					const cacheDeleteMetaPromise = caches.default.delete(getImageMetaURL(request.url, original_image_name));
+					const cacheDeleteImagePromise = caches.default.delete(getImageURL(request.url, original_image_name));
 
-					await caches.default.delete(getImageURL(request.url, original_image_name));
+					await Promise.allSettled([imageBucketPromise, cacheDeleteImagePromise, cacheDeleteMetaPromise]);
 				});
 
 				ctx.waitUntil(aiPromise);

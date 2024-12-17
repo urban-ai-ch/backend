@@ -40,15 +40,12 @@ const service: Service = {
 
 		switch (request.method + ' ' + subPath.split('/')[0]) {
 			case 'GET self': {
-				const username = 'a';
-				const amount = 0;
-
 				const tokensResult = await env.DB.prepare(
 					`SELECT token_count
 					FROM tokens
 					WHERE user_name = ?`,
 				)
-					.bind(username)
+					.bind(authContext.username)
 					.first<TokensRow>();
 
 				const response: TokenResponse = {

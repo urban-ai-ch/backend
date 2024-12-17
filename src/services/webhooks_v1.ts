@@ -2,8 +2,8 @@ import Stripe from 'stripe';
 import { Service } from '..';
 import { GroundingSamInput, imageAnalyticsAI, replicateURL } from './ai_v1';
 import Replicate, { validateWebhook } from 'replicate';
-import { Criteria, getImageMetaURL, getImageURL, ImageMetaData } from './images_v1';
 import { updateTokenCount } from './tokens_v1';
+import { stripeSumItemsByName } from './payments_v1';
 
 export type ReplicatePrediction<I> = {
 	id: string;
@@ -13,41 +13,12 @@ export type ReplicatePrediction<I> = {
 	metrics: any;
 };
 
-export const stripeSumItemsByName = async (
-	lineItems: Stripe.ApiList<Stripe.LineItem>,
-	name: string,
-	stripe: Stripe,
-): Promise<number> => {
-	let totalAmount = 0;
-
-	for (const item of lineItems.data) {
-		if (!item.price) continue;
-
-		let product = item.price.product;
-		if (typeof product === 'string') product = await stripe.products.retrieve(product);
-		if (product.deleted) continue;
-
-		totalAmount += product.name === name ? (item.quantity ?? 0) : 0;
-	}
-
-	return lineItems.has_more
-		? totalAmount +
-				(await stripeSumItemsByName(
-					await stripe.checkout.sessions.listLineItems('session_id', {
-						starting_after: lineItems.data[lineItems.data.length - 1].id,
-					}),
-					name,
-					stripe,
-				))
-		: totalAmount;
-};
-
 const service: Service = {
 	path: '/webhooks/v1/',
 
 	fetch: async (request: Request, env: Env, ctx: ExecutionContext, subPath: string): Promise<Response | void> => {
 		switch (request.method + ' ' + subPath.split('/')[0]) {
-			case 'GET stripe': {
+			case 'POST stripe': {
 				const event = await request.json<Stripe.Event>();
 				const stripe = new Stripe(env.STRIPE_PRIVATE_KEY);
 

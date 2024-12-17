@@ -2,7 +2,6 @@ import { Service } from '..';
 import { authenticateToken } from './auth_v1';
 
 import Stripe from 'stripe';
-import { stripeSumItemsByName } from './webhooks_v1';
 
 type OrderResponse = {
 	clientSecret: string;
@@ -13,6 +12,35 @@ type SessionStatusResponse = {
 	quantity: number;
 	amount_total: number;
 	customer_email: string | null;
+};
+
+export const stripeSumItemsByName = async (
+	lineItems: Stripe.ApiList<Stripe.LineItem>,
+	name: string,
+	stripe: Stripe,
+): Promise<number> => {
+	let totalAmount = 0;
+
+	for (const item of lineItems.data) {
+		if (!item.price) continue;
+
+		let product = item.price.product;
+		if (typeof product === 'string') product = await stripe.products.retrieve(product);
+		if (product.deleted) continue;
+
+		totalAmount += product.name === name ? (item.quantity ?? 0) : 0;
+	}
+
+	return lineItems.has_more
+		? totalAmount +
+				(await stripeSumItemsByName(
+					await stripe.checkout.sessions.listLineItems('session_id', {
+						starting_after: lineItems.data[lineItems.data.length - 1].id,
+					}),
+					name,
+					stripe,
+				))
+		: totalAmount;
 };
 
 const service: Service = {
@@ -71,7 +99,6 @@ const service: Service = {
 				try {
 					const session = await stripe.checkout.sessions.retrieve(url.searchParams.get('session_id') ?? '');
 
-					console.log(session);
 					if (!session.status || !session.amount_total || !session.id) {
 						return new Response('Fields missing', { status: 400 });
 					}

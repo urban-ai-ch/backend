@@ -5,6 +5,6 @@ export { default as geojson } from './geojson_v1';
 export { default as mail } from './mail_v1';
 export { default as users } from './users_v1';
 export { default as ai } from './ai_v1';
-export { default as payment } from './payment_v1';
+export { default as payments } from './payments_v1';
 export { default as webhooks } from './webhooks_v1';
 export { default as tokens } from './tokens_v1';

@@ -16,7 +16,7 @@ type SessionStatusResponse = {
 };
 
 const service: Service = {
-	path: '/tokens/v1/',
+	path: '/payments/v1/',
 
 	fetch: async (request: Request, env: Env, ctx: ExecutionContext, subPath: string): Promise<Response | void> => {
 		const authContext = await authenticateToken(request.headers, env);
@@ -71,6 +71,7 @@ const service: Service = {
 				try {
 					const session = await stripe.checkout.sessions.retrieve(url.searchParams.get('session_id') ?? '');
 
+					console.log(session);
 					if (!session.status || !session.amount_total || !session.line_items) {
 						return new Response('Fields missing', { status: 400 });
 					}

@@ -143,7 +143,6 @@ const service: Service = {
 				const imageKey = encodeURIComponent(new URL(input.image_url).pathname);
 				const inputKey = encodeURIComponent(input.labels.toString());
 				const cacheKey = `${replicateURL}-${imageKey}-${inputKey}`;
-				console.log({ replicateURL, imageKey, inputKey });
 				console.log('cacheKey match', cacheKey);
 
 				const response = await caches.default.match(cacheKey);

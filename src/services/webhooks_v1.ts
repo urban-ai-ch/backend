@@ -72,7 +72,6 @@ const service: Service = {
 				const imageKey = encodeURIComponent(new URL(prediction.input.image_url).pathname);
 				const inputKey = encodeURIComponent(prediction.input.labels.toString());
 				const cacheKey = `${replicateURL}-${imageKey}-${inputKey}`;
-				console.log({ replicateURL, imageKey, inputKey });
 				console.log('cacheKey put', cacheKey);
 				const cacheResponse = new Response(prediction.output, {
 					headers: {

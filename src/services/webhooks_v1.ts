@@ -26,16 +26,18 @@ const service: Service = {
 					case 'checkout.session.completed':
 						const paymentIntent = event.data.object;
 
-						if (!paymentIntent.line_items) {
-							return new Response('Items missing', { status: 400 });
+						if (!paymentIntent.id) {
+							return new Response('Id missing', { status: 400 });
 						}
+
+						const line_items = await stripe.checkout.sessions.listLineItems(paymentIntent.id);
 
 						if (!paymentIntent.metadata || !paymentIntent.metadata['username']) {
 							return new Response('Username missing', { status: 400 });
 						}
 
 						const username = paymentIntent.metadata['username'];
-						const quantity = await stripeSumItemsByName(paymentIntent.line_items, 'Token', stripe);
+						const quantity = await stripeSumItemsByName(line_items, 'Token', stripe);
 
 						const success = await updateTokenCount(env, username, quantity);
 						if (success) {

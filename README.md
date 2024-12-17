@@ -4,6 +4,20 @@ Base URL: `https://webdev-hs24.gerberservices.com/`
 
 ## Services
 
+### AI
+
+- POST `ai/v1/detection`
+
+  - Payload: 
+
+    ```ts
+      type DetectionPayload = {
+	      imageName: string;
+	      criteria: Criteria;
+      };
+    ```
+}; 
+
 ### Auth
 
 - POST `/auth/v1/signup`
@@ -11,11 +25,11 @@ Base URL: `https://webdev-hs24.gerberservices.com/`
   - Payload:
 
     ```ts
-    type SignUpPayload = {
-    	username: string;
-    	password: string;
-    	email: string;
-    };
+      type SignUpPayload = {
+    	  username: string;
+    	  password: string;
+    	  email: string;
+      };
     ```
 
 - POST `/auth/v1/signin`
@@ -23,19 +37,28 @@ Base URL: `https://webdev-hs24.gerberservices.com/`
   - Payload:
 
     ```ts
-    type SignInPayload = {
-    	username: string;
-    	password: string;
-    };
+      type SignInPayload = {
+    	  username: string;
+    	  password: string;
+      };
     ```
 
   - Response:
 
     ```ts
-    type AuthTokenResponse = {
-    	token: string;
-    };
+      type AuthTokenResponse = {
+    	  token: string;
+      };
     ```
+  - GET `auth/v1/auth`
+
+    - Response: status `200` or `401`
+
+### Geojson
+
+- GET `/geosjon/v1/geojson/{filename}`
+
+  - Response: `image`
 
 ### Images
 
@@ -43,27 +66,64 @@ Base URL: `https://webdev-hs24.gerberservices.com/`
 
   - Payload: `image/jpeg`
 
-- GET`/images/v1/image/[imageName].jpg`
+- GET `/images/v1/image/{filename}`
 
-  - Response: `[imageName].jpg`
+  - Response: `image`
+
+- GET `/images/v1/metadata/{filename}`
+
+  - Response:
+
+    ```ts
+      export type Criteria = 'materials' | 'history' | 'seismic';
+      export type ImageMetaData = {
+	      [key in Criteria]?: string;
+      };
+    ```
 
 - GET `/images/v1/images`
 
   - Response:
 
     ```ts
-    type ImagesResponse = {
-    	name: string;
-    	href: string;
-    }[];
+      type ImagesResponse = {
+    	  name: string;
+    	  href: string;
+      }[];
     ```
 
-### Test
+### Mail
 
-- GET `/test/v1/ping`
+- POST `/mail/v1/[broadcast | noah | sai | eren]`
 
-  - Response: "Pong"
+  - Payload: 
+  
+    ```ts
+      type MailPayload = {
+	      subject: string;
+	      message: string;
+      };
+    ```
 
-- GET `/test/v1/auth`
+### Payments
 
-  - Response: `Auth Status`
+- POST `payments/v1/create-checkout-session`
+
+  - Response:
+    ```ts
+      type OrderResponse = {
+        clientSecret: string;
+      };
+    ```
+
+- GET `payments/v1/session-status`
+
+  - Response:
+    ```ts
+      type SessionStatusResponse = {
+        status: string;
+        quantity: number;
+        amount_total: number;
+        customer_email: string | null;
+      };
+    ```

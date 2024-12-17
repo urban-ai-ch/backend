@@ -18,6 +18,81 @@ type ReplicatePayload = {
 	webhook_events_filter: string[];
 };
 
+type AiInput = {
+	[key in Criteria]?: string;
+};
+
+const replicate_model_owner = 'gerbernoah';
+const replicate_deployment_name = 'urban-ai-grounding-sam';
+const cloudflareAccountID = '5b90fdf2bc4e39874b024b2bc8cd5d13';
+const gatewayID = 'webdev-hs24';
+
+export const replicateURL = `https://gateway.ai.cloudflare.com/v1/${cloudflareAccountID}/${gatewayID}/replicate/deployments/${replicate_model_owner}/${replicate_deployment_name}/predictions`;
+
+export const imageAnalyticsAI = async (request: Request, env: Env, url: string): Promise<Response> => {
+	console.log('ImageAnalytics input img ' + url);
+
+	const image = await (await fetch(url)).arrayBuffer();
+
+	const criteria = new URL(request.url).searchParams.get('criteria') as Criteria;
+
+	const aiInput: AiInput = {
+		materials:
+			'List only the main building materials used in the construction of the building in the image. No filler words, just the materials',
+		history: 'Provide a brief history of this building, including its construction date',
+		seismic: "What's the seismic risk of this building",
+	};
+
+	const prompt = aiInput[criteria];
+
+	if (!prompt) {
+		console.log('Criteria not found');
+		return new Response('Criteria not found', { status: 400 });
+	}
+
+	const input = {
+		image: [...new Uint8Array(image)],
+		prompt: aiInput[criteria],
+		max_tokens: 20,
+	};
+
+	const headers = new Headers();
+	headers.set('cf-aig-authorization', `Bearer ${env.AI_GATEWAY_TOKEN}`);
+
+	const aiPromise = env.AI.run('@cf/unum/uform-gen2-qwen-500m', input, {
+		extraHeaders: headers,
+		gateway: { id: 'webdev-hs24', collectLog: true },
+	}).then(async (response) => {
+		console.log('LLM result: ' + response.description);
+
+		const original_image_name = new URL(request.url).searchParams.get('original_image_name');
+		if (!original_image_name) return new Response('Original image name missing', { status: 400 });
+
+		const original = await env.IMAGES_BUCKET.get(original_image_name);
+		if (!original) return new Response('Original Image not found', { status: 400 });
+
+		let metaData: ImageMetaData = {
+			history: original.customMetadata?.history,
+			materials: original.customMetadata?.materials,
+			seismic: original.customMetadata?.seismic,
+		};
+
+		metaData[criteria] = response.description;
+
+		const imageBucketPromise = env.IMAGES_BUCKET.put(original_image_name, await original.blob(), {
+			customMetadata: metaData,
+		});
+		const cacheDeleteMetaPromise = caches.default.delete(getImageMetaURL(request.url, original_image_name));
+		const cacheDeleteImagePromise = caches.default.delete(getImageURL(request.url, original_image_name));
+
+		await Promise.allSettled([imageBucketPromise, cacheDeleteImagePromise, cacheDeleteMetaPromise]);
+
+		return new Response('Information generated', { status: 200 });
+	});
+
+	return aiPromise;
+};
+
 const service: Service = {
 	path: '/ai/v1/',
 
@@ -37,7 +112,6 @@ const service: Service = {
 				const original = await env.IMAGES_BUCKET.get(payload.imageName);
 				if (!original) return new Response('Original Image not found');
 
-				console.log(original.customMetadata);
 				const metaData: ImageMetaData = {
 					materials: original.customMetadata?.materials,
 					history: original.customMetadata?.history,
@@ -45,8 +119,6 @@ const service: Service = {
 				};
 
 				metaData[payload.criteria] = 'Processing';
-
-				console.log(metaData);
 
 				await env.IMAGES_BUCKET.put(payload.imageName, await original.blob(), {
 					customMetadata: metaData,
@@ -63,26 +135,35 @@ const service: Service = {
 					webhook_events_filter: ['output'],
 				};
 
-				const headers = new Headers();
-				headers.set('Authorization', `Bearer ${env.REPLICATE_API_TOKEN}`);
-				headers.set('cf-aig-authorization', `Bearer ${env.AI_GATEWAY_TOKEN}`);
-				headers.set('Content-Type', 'application/json');
-				headers.set('cf-aig-skip-cache', 'true');
+				const imageKey = encodeURIComponent(new URL(input.image_url).pathname);
+				const inputKey = encodeURIComponent(input.labels.toString());
+				const cacheKey = `${replicateURL}-${imageKey}-${inputKey}`;
+				console.log({ replicateURL, imageKey, inputKey });
+				console.log('cacheKey match', cacheKey);
 
-				const model_owner = 'gerbernoah';
-				const deployment_name = 'urban-ai-grounding-sam';
-				const cloudflareAccountID = '5b90fdf2bc4e39874b024b2bc8cd5d13';
-				const gatewayID = 'webdev-hs24';
+				const response = await caches.default.match(cacheKey);
 
-				const replicateURL = `https://gateway.ai.cloudflare.com/v1/${cloudflareAccountID}/${gatewayID}/replicate/deployments/${model_owner}/${deployment_name}/predictions`;
+				if (response) {
+					const url = await response.text();
+					console.log('Grounding-Sam cached');
 
-				const replicatePromise = fetch(replicateURL, {
-					method: 'POST',
-					body: JSON.stringify(replicateBody),
-					headers,
-				});
+					ctx.waitUntil(imageAnalyticsAI(request, env, url));
+				} else {
+					const replicatePromise = fetch(replicateURL, {
+						method: 'POST',
+						body: JSON.stringify(replicateBody),
+						headers: {
+							Authorization: `Bearer ${env.REPLICATE_API_TOKEN}`,
+							'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
+							'Content-Type': 'application/json',
+							'cf-aig-skip-cache': 'true',
+						},
+					});
 
-				ctx.waitUntil(Promise.allSettled([replicatePromise]));
+					console.log('Grounding-Sam fetching');
+
+					ctx.waitUntil(replicatePromise);
+				}
 
 				return new Response('Job queued', { status: 200 });
 			}

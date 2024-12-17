@@ -3,6 +3,7 @@ import { Service } from '..';
 import { GroundingSamInput, imageAnalyticsAI, replicateURL } from './ai_v1';
 import Replicate, { validateWebhook } from 'replicate';
 import { Criteria, getImageMetaURL, getImageURL, ImageMetaData } from './images_v1';
+import { updateTokenCount } from './tokens_v1';
 
 export type ReplicatePrediction<I> = {
 	id: string;
@@ -65,25 +66,12 @@ const service: Service = {
 						const username = paymentIntent.metadata['username'];
 						const quantity = await stripeSumItemsByName(paymentIntent.line_items, 'Token', stripe);
 
-						const tokensResult = await env.DB.prepare(
-							`SELECT token_count
-              FROM tokens
-              WHERE user_name = ?`,
-						)
-							.bind(username)
-							.first<TokensRow>();
-
-						const writeStmt = env.DB.prepare(
-							`INSERT INTO tokens(user_name, token_count)
-              VALUES(?, ?)
-              ON CONFLICT(user_name)
-              DO UPDATE SET user_name = excluded.user_name, token_count = excluded.token_count`,
-						);
-
-						const updatedTokens = quantity + (tokensResult?.token_count ?? 0);
-						await writeStmt.bind(username, updatedTokens).run<TokensRow>();
-
-						return new Response(`Added ${quantity} tokens`, { status: 200 });
+						const success = await updateTokenCount(env, username, quantity);
+						if (success) {
+							return new Response(`Added ${quantity} tokens`, { status: 200 });
+						} else {
+							return new Response('An error occured while crediting tokens');
+						}
 					default:
 						return;
 				}

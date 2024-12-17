@@ -1,6 +1,7 @@
 import { Service } from '..';
 import { authenticateToken } from './auth_v1';
 import { Criteria, getImageMetaURL, getImageURL, ImageMetaData } from './images_v1';
+import { updateTokenCount } from './tokens_v1';
 
 type DetectionPayload = {
 	imageName: string;
@@ -102,6 +103,10 @@ const service: Service = {
 
 		switch (request.method + ' ' + subPath.split('/')[0]) {
 			case 'POST detection': {
+				if (await updateTokenCount(env, authContext.username, -1)) {
+					return new Response('Not enough tokens', { status: 402 });
+				}
+
 				const payload = await request.json<DetectionPayload>();
 
 				const input: GroundingSamInput = {

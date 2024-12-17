@@ -5,6 +5,32 @@ type TokenResponse = {
 	tokenCount: number;
 };
 
+export const updateTokenCount = async (env: Env, username: string, quantity: number): Promise<boolean> => {
+	const tokensResult = await env.DB.prepare(
+		`SELECT token_count
+								FROM tokens
+								WHERE user_name = ?`,
+	)
+		.bind(username)
+		.first<TokensRow>();
+
+	const current = tokensResult?.token_count ?? 0;
+	const updatedTokens = quantity + current;
+
+	if (updatedTokens < 0) return false;
+
+	const writeStmt = env.DB.prepare(
+		`INSERT INTO tokens(user_name, token_count)
+								VALUES(?, ?)
+								ON CONFLICT(user_name)
+								DO UPDATE SET user_name = excluded.user_name, token_count = excluded.token_count`,
+	);
+
+	const result = await writeStmt.bind(username, updatedTokens).run<TokensRow>();
+
+	return !result.error;
+};
+
 const service: Service = {
 	path: '/tokens/v1/',
 

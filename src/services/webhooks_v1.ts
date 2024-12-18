@@ -93,7 +93,7 @@ const service: Service = {
 							await updateMetaData(request, env, pipeLineStorage.orgImageName, pipeLineStorage.criteria, result);
 						},
 						async (e) => {
-							console.log(`Error in image analytics ai. Error: ${e}`);
+							console.error(`Error in image analytics ai. Error: ${e}`);
 							await updateMetaData(
 								request,
 								env,

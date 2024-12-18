@@ -25,6 +25,9 @@ type AiInput = {
 	[key in Criteria]?: string;
 };
 
+const cloudflareAccountID = '5b90fdf2bc4e39874b024b2bc8cd5d13';
+const gatewayID = 'urban-ai-gateway';
+
 export const PIPELINE_KEY_NAME = 'pipelineKey';
 
 export const imageAnalyticsAI = async (env: Env, url: string, criteria: Criteria): Promise<string | Response> => {
@@ -48,6 +51,7 @@ export const imageAnalyticsAI = async (env: Env, url: string, criteria: Criteria
 
 	console.log(`LLM prompt: ${prompt}`);
 
+	const payload = {};
 	const result = await env.AI.run(
 		'@cf/unum/uform-gen2-qwen-500m',
 		{
@@ -59,9 +63,25 @@ export const imageAnalyticsAI = async (env: Env, url: string, criteria: Criteria
 			extraHeaders: {
 				'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
 			},
-			gateway: { id: 'webdev-hs24', collectLog: true },
+			gateway: { id: gatewayID, collectLog: true },
 		},
-	);
+	).catch(async () => {
+		console.log('Fallback ai');
+		return env.AI.run(
+			'@cf/llava-hf/llava-1.5-7b-hf',
+			{
+				image: [...new Uint8Array(image)],
+				prompt,
+				max_tokens: 20,
+			},
+			{
+				extraHeaders: {
+					'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
+				},
+				gateway: { id: gatewayID, collectLog: true },
+			},
+		);
+	});
 
 	console.log(`LLM result: ${result.description}`);
 	return result.description;
@@ -121,7 +141,7 @@ const service: Service = {
 										await updateMetaData(request, env, pipeLineStorage.orgImageName, pipeLineStorage.criteria, result);
 									},
 									async (e) => {
-										console.log(`Error in image analytics ai. Error: ${e}`);
+										console.error(`Error in image analytics ai. Error: ${e}`);
 										await updateMetaData(
 											request,
 											env,
@@ -150,8 +170,6 @@ const service: Service = {
 
 					const replicate_model_owner = 'gerbernoah';
 					const replicate_deployment_name = 'urban-ai-grounding-sam';
-					const cloudflareAccountID = '5b90fdf2bc4e39874b024b2bc8cd5d13';
-					const gatewayID = 'webdev-hs24';
 
 					ctx.waitUntil(
 						fetch(
@@ -171,7 +189,7 @@ const service: Service = {
 
 					return new Response('Job queued', { status: 200 });
 				} catch (e) {
-					console.log(`Error in grounding-sam ai. Error: ${e}`);
+					console.error(`Error in grounding-sam ai. Error: ${e}`);
 
 					ctx.waitUntil(updateMetaData(request, env, payload.imageName, payload.criteria, 'Error in grounding-sam ai'));
 					let pipeLineStorage: AIPipeLineKV | null = await env.AI_PIPELINE_KV.get(pipeLineKey, 'json');

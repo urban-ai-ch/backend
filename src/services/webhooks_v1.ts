@@ -1,9 +1,11 @@
 import Stripe from 'stripe';
 import { Service } from '..';
-import { GroundingSamInput, imageAnalyticsAI } from './ai_v1';
+import { GroundingSamInput, imageAnalyticsAI, PIPELINE_KEY_NAME } from './ai_v1';
 import Replicate, { validateWebhook } from 'replicate';
 import { updateTokenCount } from './tokens_v1';
 import { stripeSumItemsByName } from './payments_v1';
+import { Criteria, saveMetaData } from './images_v1';
+import { AIPipeLineKV } from '../types';
 
 export type ReplicatePrediction<I> = {
 	id: string;
@@ -60,17 +62,36 @@ const service: Service = {
 
 				const prediction = await request.json<ReplicatePrediction<GroundingSamInput>>();
 
-				const cache: CacheKV = {
-					processing: false,
-					url: prediction.output,
-				};
-				const cacheKVPutPromise = env.CACHE_KV.put(
-					`grounding-sam/${JSON.stringify(prediction.input)}`,
-					JSON.stringify(cache),
-					{ expirationTtl: 60 * 60 - 1 },
+				const pipelineKey = new URL(request.url).searchParams.get(PIPELINE_KEY_NAME);
+
+				if (!pipelineKey) {
+					console.log('Pipeline key not found');
+					return new Response('Pipeline key not found', { status: 400 });
+				}
+
+				let pipeLineStorage: AIPipeLineKV | null = await env.AI_PIPELINE_KV.get(pipelineKey, 'json');
+
+				if (!pipeLineStorage) {
+					console.log('No data for pipeline key');
+					return new Response('No data for pipeline key', { status: 400 });
+				}
+
+				pipeLineStorage.processing = false;
+				pipeLineStorage.croppedImageUrl = prediction.output;
+
+				ctx.waitUntil(
+					env.AI_PIPELINE_KV.put(pipelineKey, JSON.stringify(pipeLineStorage), {
+						expirationTtl: 60 * 60 - 1,
+					}),
 				);
 
-				ctx.waitUntil(Promise.allSettled([cacheKVPutPromise, imageAnalyticsAI(request, env, prediction.output)]));
+				ctx.waitUntil(
+					imageAnalyticsAI(env, pipeLineStorage.croppedImageUrl, pipeLineStorage.criteria).then(async (result) => {
+						if (result instanceof Response) return result;
+
+						await saveMetaData(request, env, pipeLineStorage.orgImageName, pipeLineStorage.criteria, result);
+					}),
+				);
 
 				return new Response('Result received', { status: 200 });
 			}

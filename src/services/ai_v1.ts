@@ -1,6 +1,8 @@
 import { Service } from '..';
+import { hash } from '../auth';
+import { AIPipeLineKV } from '../types';
 import { authenticateToken } from './auth_v1';
-import { Criteria, getImageMetaURL, getImageURL, ImageMetaData } from './images_v1';
+import { Criteria, getImageMetaURL, getImageURL, ImageMetaData, saveMetaData } from './images_v1';
 import { updateTokenCount } from './tokens_v1';
 
 type DetectionPayload = {
@@ -23,12 +25,12 @@ type AiInput = {
 	[key in Criteria]?: string;
 };
 
-export const imageAnalyticsAI = async (request: Request, env: Env, url: string): Promise<Response> => {
-	console.log('ImageAnalytics input img ' + url);
+export const PIPELINE_KEY_NAME = 'pipelineKey';
+
+export const imageAnalyticsAI = async (env: Env, url: string, criteria: Criteria): Promise<string | Response> => {
+	console.log(`LLM url: ${url}`);
 
 	const image = await (await fetch(url)).arrayBuffer();
-
-	const criteria = new URL(request.url).searchParams.get('criteria') as Criteria;
 
 	const aiInput: AiInput = {
 		materials:
@@ -44,47 +46,25 @@ export const imageAnalyticsAI = async (request: Request, env: Env, url: string):
 		return new Response('Criteria not found', { status: 400 });
 	}
 
-	const input = {
-		image: [...new Uint8Array(image)],
-		prompt: aiInput[criteria],
-		max_tokens: 20,
-	};
+	console.log(`LLM prompt: ${prompt}`);
 
-	const headers = new Headers();
-	headers.set('cf-aig-authorization', `Bearer ${env.AI_GATEWAY_TOKEN}`);
+	const result = await env.AI.run(
+		'@cf/unum/uform-gen2-qwen-500m',
+		{
+			image: [...new Uint8Array(image)],
+			prompt,
+			max_tokens: 20,
+		},
+		{
+			extraHeaders: {
+				'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
+			},
+			gateway: { id: 'webdev-hs24', collectLog: true },
+		},
+	);
 
-	const aiPromise = env.AI.run('@cf/unum/uform-gen2-qwen-500m', input, {
-		extraHeaders: headers,
-		gateway: { id: 'webdev-hs24', collectLog: true },
-	}).then(async (response) => {
-		console.log('LLM result: ' + response.description);
-
-		const original_image_name = new URL(request.url).searchParams.get('original_image_name');
-		if (!original_image_name) return new Response('Original image name missing', { status: 400 });
-
-		const original = await env.IMAGES_BUCKET.get(original_image_name);
-		if (!original) return new Response('Original Image not found', { status: 400 });
-
-		let metaData: ImageMetaData = {
-			history: original.customMetadata?.history,
-			materials: original.customMetadata?.materials,
-			seismic: original.customMetadata?.seismic,
-		};
-
-		metaData[criteria] = response.description;
-
-		const imageBucketPromise = env.IMAGES_BUCKET.put(original_image_name, await original.blob(), {
-			customMetadata: metaData,
-		});
-
-		const cacheDeleteMetaPromise = caches.default.delete(getImageMetaURL(request.url, original_image_name));
-
-		await Promise.allSettled([imageBucketPromise, cacheDeleteMetaPromise]);
-
-		return new Response('Information generated', { status: 200 });
-	});
-
-	return aiPromise;
+	console.log(`LLM result: ${result.description}`);
+	return result.description;
 };
 
 const service: Service = {
@@ -124,9 +104,10 @@ const service: Service = {
 					});
 					ctx.waitUntil(caches.default.delete(getImageMetaURL(request.url, payload.imageName)));
 
+					const pipelineKey = await hash(JSON.stringify(payload));
+
 					const webhookUrl = new URL(`https://${new URL(request.url).host}/webhooks/v1/replicate`);
-					webhookUrl.searchParams.set('original_image_name', payload.imageName);
-					webhookUrl.searchParams.set('criteria', payload.criteria);
+					webhookUrl.searchParams.set(PIPELINE_KEY_NAME, pipelineKey);
 
 					const replicateBody: ReplicatePayload = {
 						input: input,
@@ -134,16 +115,25 @@ const service: Service = {
 						webhook_events_filter: ['output'],
 					};
 
-					const cacheOutput: CacheKV | null = await env.CACHE_KV.get(`grounding-sam/${JSON.stringify(input)}`, 'json');
-					if (cacheOutput) {
-						if (cacheOutput.processing == true) {
+					const pipeLineStorage: AIPipeLineKV | null = await env.AI_PIPELINE_KV.get(pipelineKey, 'json');
+					if (pipeLineStorage) {
+						if (pipeLineStorage.processing == true) {
 							return new Response('Job still running', { status: 200 });
 						}
 
-						if (cacheOutput.url) {
+						if (pipeLineStorage.croppedImageUrl) {
 							console.log('Grounding-Sam cached');
 
-							ctx.waitUntil(imageAnalyticsAI(request, env, cacheOutput.url));
+							ctx.waitUntil(
+								imageAnalyticsAI(env, pipeLineStorage.croppedImageUrl, pipeLineStorage.criteria).then(
+									async (result) => {
+										if (result instanceof Response) return result;
+
+										await saveMetaData(request, env, pipeLineStorage.orgImageName, pipeLineStorage.criteria, result);
+									},
+								),
+							);
+
 							return new Response('Job queued', { status: 200 });
 						} else {
 							console.log('Cached url not available');
@@ -152,10 +142,12 @@ const service: Service = {
 
 					console.log('Grounding-Sam fetching');
 
-					const cacheInput: CacheKV = {
+					const cacheInput: AIPipeLineKV = {
+						orgImageName: payload.imageName,
+						criteria: payload.criteria,
 						processing: true,
 					};
-					ctx.waitUntil(env.CACHE_KV.put(`grounding-sam/${JSON.stringify(input)}`, JSON.stringify(cacheInput)));
+					ctx.waitUntil(env.AI_PIPELINE_KV.put(`grounding-sam/${JSON.stringify(input)}`, JSON.stringify(cacheInput)));
 
 					const replicate_model_owner = 'gerbernoah';
 					const replicate_deployment_name = 'urban-ai-grounding-sam';

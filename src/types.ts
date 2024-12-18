@@ -1,16 +1,20 @@
-type AccountKV = {
+import { Criteria } from './services/images_v1';
+
+export type AccountKV = {
 	username: string;
 	password: string;
 	email: string;
 	bio?: string;
 };
 
-type CacheKV = {
+export type AIPipeLineKV = {
 	processing: boolean;
-	url?: string;
+	criteria: Criteria;
+	orgImageName: string;
+	croppedImageUrl?: string;
 };
 
-type TokensRow = {
+export type TokensRow = {
 	user_name: string;
 	token_count: number;
 };

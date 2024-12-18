@@ -19,6 +19,35 @@ export const getImageMetaURL = (url: string, imageName: string): string => {
 	return `https://${new URL(url).host}/images/v1/metadata/${imageName}`;
 };
 
+export const saveMetaData = async (
+	request: Request,
+	env: Env,
+	imageName: string,
+	criteria: Criteria,
+	description: string,
+) => {
+	const original = await env.IMAGES_BUCKET.get(imageName);
+	if (!original) return new Response('Original Image not found', { status: 400 });
+
+	let metaData: ImageMetaData = {
+		history: original.customMetadata?.history,
+		materials: original.customMetadata?.materials,
+		seismic: original.customMetadata?.seismic,
+	};
+
+	metaData[criteria] = description;
+
+	const imageBucketPromise = env.IMAGES_BUCKET.put(imageName, await original.blob(), {
+		customMetadata: metaData,
+	});
+
+	const cacheDeleteMetaPromise = caches.default.delete(getImageMetaURL(request.url, imageName));
+
+	await Promise.allSettled([imageBucketPromise, cacheDeleteMetaPromise]);
+
+	return new Response('Information generated', { status: 200 });
+};
+
 const service: Service = {
 	path: '/images/v1/',
 

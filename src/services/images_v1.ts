@@ -101,15 +101,24 @@ const service: Service = {
 				return response;
 			}
 			case 'DELETE image': {
-				const cacheResponse = await caches.default.match(request.url);
+				if (authContext instanceof Response) return authContext;
+
+				const cacheKey = `${request.url}-${authContext.username}`;
+				const cacheResponse = await caches.default.match(cacheKey);
 				if (cacheResponse) return cacheResponse;
 
 				const imageName = args[1];
-				await env.IMAGES_BUCKET.delete(imageName);
 
-				const response = new Response('Resource deleted successfully', { status: 204 });
+				let response;
+				if (imageName.includes(authContext.username)) {
+					await env.IMAGES_BUCKET.delete(imageName);
 
-				ctx.waitUntil(caches.default.put(request.url, response.clone()));
+					response = new Response('Resource deleted successfully', { status: 204 });
+				} else {
+					response = new Response('You do not have permission to delete this resource', { status: 403 });
+				}
+
+				ctx.waitUntil(caches.default.put(cacheKey, response.clone()));
 
 				return response;
 			}

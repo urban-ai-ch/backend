@@ -1,4 +1,5 @@
 import { Service } from '..';
+import { TokensRow } from '../types';
 import { authenticateToken } from './auth_v1';
 
 type TokenResponse = {

@@ -170,7 +170,7 @@ const service: Service = {
 
 				const response = new Response(JSON.stringify(metaData), {
 					status: 200,
-					headers: { 'Cache-Control': 'private, max-age=31536000' },
+					headers: { 'Cache-Control': 'private, max-age=1, s-maxage=31536000' },
 				});
 
 				ctx.waitUntil(caches.default.put(request.url, response.clone()));

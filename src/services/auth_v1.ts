@@ -1,5 +1,6 @@
 import { Service } from '..';
 import { hash, signJWT, verifyJWT } from '../auth';
+import { AccountKV } from '../types';
 
 type SignUpPayload = {
 	username: string;
@@ -30,7 +31,7 @@ const service: Service = {
 
 		switch (request.method + ' ' + subPath.split('/')[0]) {
 			case 'POST signup': {
-				return new Response('Signup disabled', { status: 409 });
+				//return new Response('Signup disabled', { status: 409 });
 
 				const { username, password, email } = await request.json<SignUpPayload>();
 

@@ -2,7 +2,7 @@ import { Service } from '..';
 import { hash } from '../auth';
 import { AIPipeLineKV } from '../types';
 import { authenticateToken } from './auth_v1';
-import { Criteria, getImageMetaURL, getImageURL, ImageMetaData, saveMetaData } from './images_v1';
+import { Criteria, getImageMetaURL, getImageURL, ImageMetaData, updateMetaData } from './images_v1';
 import { updateTokenCount } from './tokens_v1';
 
 type DetectionPayload = {
@@ -75,39 +75,26 @@ const service: Service = {
 		if (authContext instanceof Response) return authContext;
 
 		switch (request.method + ' ' + subPath.split('/')[0]) {
-			case 'POST detection':
-				{
-					if (!(await updateTokenCount(env, authContext.username, -1))) {
-						return new Response('Not enough tokens', { status: 402 });
-					}
+			case 'POST detection': {
+				if (!(await updateTokenCount(env, authContext.username, -1))) {
+					return new Response('Not enough tokens', { status: 402 });
+				}
 
-					const payload = await request.json<DetectionPayload>();
+				const payload = await request.json<DetectionPayload>();
 
-					const input: GroundingSamInput = {
-						image_url: getImageURL(request.url, payload.imageName),
-						labels: ['house facade'],
-					};
+				const input: GroundingSamInput = {
+					image_url: getImageURL(request.url, payload.imageName),
+					labels: ['house facade'],
+				};
 
-					const original = await env.IMAGES_BUCKET.get(payload.imageName);
-					if (!original) return new Response('Original Image not found');
+				ctx.waitUntil(
+					updateMetaData(request, env, payload.imageName, payload.criteria, 'Processing').then(
+						async () => await caches.default.delete(getImageMetaURL(request.url, payload.imageName)),
+					),
+				);
 
-					const metaData: ImageMetaData = {
-						materials: original.customMetadata?.materials,
-						history: original.customMetadata?.history,
-						seismic: original.customMetadata?.seismic,
-					};
-
-					metaData[payload.criteria] = 'Processing';
-
-					await env.IMAGES_BUCKET.put(payload.imageName, await original.blob(), {
-						customMetadata: metaData,
-					});
-					ctx.waitUntil(caches.default.delete(getImageMetaURL(request.url, payload.imageName)));
-
-					const pipeLineKey = await hash(JSON.stringify(input));
-
-					console.log('Outgoing pipeline key: ' + pipeLineKey);
-
+				const pipeLineKey = await hash(JSON.stringify(input));
+				try {
 					const webhookUrl = new URL(`https://${new URL(request.url).host}/webhooks/v1/replicate`);
 					webhookUrl.searchParams.set(PIPELINE_KEY_NAME, pipeLineKey);
 
@@ -131,7 +118,7 @@ const service: Service = {
 									async (result) => {
 										if (result instanceof Response) return result;
 
-										await saveMetaData(request, env, pipeLineStorage.orgImageName, pipeLineStorage.criteria, result);
+										await updateMetaData(request, env, pipeLineStorage.orgImageName, pipeLineStorage.criteria, result);
 									},
 								),
 							);
@@ -149,7 +136,7 @@ const service: Service = {
 						criteria: payload.criteria,
 						processing: true,
 					};
-					ctx.waitUntil(env.AI_PIPELINE_KV.put(pipeLineKey, JSON.stringify(cacheInput)));
+					ctx.waitUntil(env.AI_PIPELINE_KV.put(pipeLineKey, JSON.stringify(cacheInput), { expirationTtl: 60 * 10 }));
 
 					const replicate_model_owner = 'gerbernoah';
 					const replicate_deployment_name = 'urban-ai-grounding-sam';
@@ -171,9 +158,20 @@ const service: Service = {
 							},
 						),
 					);
-				}
 
-				return new Response('Job queued', { status: 200 });
+					return new Response('Job queued', { status: 200 });
+				} catch (e) {
+					console.log(e);
+
+					ctx.waitUntil(updateMetaData(request, env, payload.imageName, payload.criteria, 'Crashed'));
+					let pipeLineStorage: AIPipeLineKV | null = await env.AI_PIPELINE_KV.get(pipeLineKey, 'json');
+
+					if (pipeLineStorage) {
+						pipeLineStorage.processing = false;
+						ctx.waitUntil(env.AI_PIPELINE_KV.put(pipeLineKey, JSON.stringify(pipeLineStorage)));
+					}
+				}
+			}
 		}
 	},
 };

@@ -19,7 +19,7 @@ export const getImageMetaURL = (url: string, imageName: string): string => {
 	return `https://${new URL(url).host}/images/v1/metadata/${imageName}`;
 };
 
-export const saveMetaData = async (
+export const updateMetaData = async (
 	request: Request,
 	env: Env,
 	imageName: string,

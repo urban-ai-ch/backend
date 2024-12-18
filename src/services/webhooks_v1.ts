@@ -4,7 +4,7 @@ import { GroundingSamInput, imageAnalyticsAI, PIPELINE_KEY_NAME } from './ai_v1'
 import Replicate, { validateWebhook } from 'replicate';
 import { updateTokenCount } from './tokens_v1';
 import { stripeSumItemsByName } from './payments_v1';
-import { Criteria, saveMetaData } from './images_v1';
+import { Criteria, updateMetaData } from './images_v1';
 import { AIPipeLineKV } from '../types';
 
 export type ReplicatePrediction<I> = {
@@ -64,7 +64,6 @@ const service: Service = {
 
 				const pipelineKey = new URL(request.url).searchParams.get(PIPELINE_KEY_NAME);
 
-				console.log('Incoming pipeline key: ' + pipelineKey);
 				if (!pipelineKey) {
 					console.log('Pipeline key not found');
 					return new Response('Pipeline key not found', { status: 400 });
@@ -90,7 +89,7 @@ const service: Service = {
 					imageAnalyticsAI(env, pipeLineStorage.croppedImageUrl, pipeLineStorage.criteria).then(async (result) => {
 						if (result instanceof Response) return result;
 
-						await saveMetaData(request, env, pipeLineStorage.orgImageName, pipeLineStorage.criteria, result);
+						await updateMetaData(request, env, pipeLineStorage.orgImageName, pipeLineStorage.criteria, result);
 					}),
 				);
 

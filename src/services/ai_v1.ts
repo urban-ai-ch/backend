@@ -99,7 +99,7 @@ const service: Service = {
 
 					metaData[payload.criteria] = 'Processing';
 
-					console.log('metadata before update: ' + metaData);
+					console.log('metadata before update: ' + JSON.stringify(metaData));
 
 					await env.IMAGES_BUCKET.put(payload.imageName, await original.blob(), {
 						customMetadata: metaData,

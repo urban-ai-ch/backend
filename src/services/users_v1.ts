@@ -37,7 +37,7 @@ const service: Service = {
 
 				return new Response(JSON.stringify(responseData), { status: 200 });
 			}
-			case 'POST me': {
+			case 'PUT me': {
 				if (authContext instanceof Response) return authContext;
 
 				const payload = await request.json<UserPayload>();

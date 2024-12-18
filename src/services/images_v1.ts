@@ -142,7 +142,7 @@ const service: Service = {
 				if (imageName.includes(authContext.username)) {
 					await env.IMAGES_BUCKET.delete(imageName);
 
-					response = new Response('Resource deleted successfully', { status: 204 });
+					response = new Response(null, { status: 204 });
 				} else {
 					response = new Response('You do not have permission to delete this resource', { status: 403 });
 				}

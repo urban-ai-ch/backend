@@ -64,6 +64,7 @@ const service: Service = {
 
 				const pipelineKey = new URL(request.url).searchParams.get(PIPELINE_KEY_NAME);
 
+				console.log('Incoming pipeline key: ' + pipelineKey);
 				if (!pipelineKey) {
 					console.log('Pipeline key not found');
 					return new Response('Pipeline key not found', { status: 400 });

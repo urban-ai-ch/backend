@@ -99,8 +99,6 @@ const service: Service = {
 
 					metaData[payload.criteria] = 'Processing';
 
-					console.log('metadata before update: ' + JSON.stringify(metaData));
-
 					await env.IMAGES_BUCKET.put(payload.imageName, await original.blob(), {
 						customMetadata: metaData,
 					});
@@ -108,7 +106,7 @@ const service: Service = {
 
 					const pipelineKey = await hash(JSON.stringify(payload));
 
-					console.log(pipelineKey);
+					console.log('Outgoing pipeline key: ' + pipelineKey);
 
 					const webhookUrl = new URL(`https://${new URL(request.url).host}/webhooks/v1/replicate`);
 					webhookUrl.searchParams.set(PIPELINE_KEY_NAME, pipelineKey);

@@ -104,12 +104,12 @@ const service: Service = {
 					});
 					ctx.waitUntil(caches.default.delete(getImageMetaURL(request.url, payload.imageName)));
 
-					const pipelineKey = await hash(JSON.stringify(payload));
+					const pipeLineKey = await hash(JSON.stringify(input));
 
-					console.log('Outgoing pipeline key: ' + pipelineKey);
+					console.log('Outgoing pipeline key: ' + pipeLineKey);
 
 					const webhookUrl = new URL(`https://${new URL(request.url).host}/webhooks/v1/replicate`);
-					webhookUrl.searchParams.set(PIPELINE_KEY_NAME, pipelineKey);
+					webhookUrl.searchParams.set(PIPELINE_KEY_NAME, pipeLineKey);
 
 					const replicateBody: ReplicatePayload = {
 						input: input,
@@ -117,7 +117,7 @@ const service: Service = {
 						webhook_events_filter: ['output'],
 					};
 
-					const pipeLineStorage: AIPipeLineKV | null = await env.AI_PIPELINE_KV.get(pipelineKey, 'json');
+					const pipeLineStorage: AIPipeLineKV | null = await env.AI_PIPELINE_KV.get(pipeLineKey, 'json');
 					if (pipeLineStorage) {
 						if (pipeLineStorage.processing == true) {
 							return new Response('Job still running', { status: 200 });
@@ -149,7 +149,7 @@ const service: Service = {
 						criteria: payload.criteria,
 						processing: true,
 					};
-					ctx.waitUntil(env.AI_PIPELINE_KV.put(pipelineKey, JSON.stringify(cacheInput)));
+					ctx.waitUntil(env.AI_PIPELINE_KV.put(pipeLineKey, JSON.stringify(cacheInput)));
 
 					const replicate_model_owner = 'gerbernoah';
 					const replicate_deployment_name = 'urban-ai-grounding-sam';

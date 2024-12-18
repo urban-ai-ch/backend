@@ -149,7 +149,7 @@ const service: Service = {
 						criteria: payload.criteria,
 						processing: true,
 					};
-					ctx.waitUntil(env.AI_PIPELINE_KV.put(`grounding-sam/${JSON.stringify(input)}`, JSON.stringify(cacheInput)));
+					ctx.waitUntil(env.AI_PIPELINE_KV.put(pipelineKey, JSON.stringify(cacheInput)));
 
 					const replicate_model_owner = 'gerbernoah';
 					const replicate_deployment_name = 'urban-ai-grounding-sam';

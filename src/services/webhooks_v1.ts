@@ -86,11 +86,23 @@ const service: Service = {
 				);
 
 				ctx.waitUntil(
-					imageAnalyticsAI(env, pipeLineStorage.croppedImageUrl, pipeLineStorage.criteria).then(async (result) => {
-						if (result instanceof Response) return result;
+					imageAnalyticsAI(env, pipeLineStorage.croppedImageUrl, pipeLineStorage.criteria).then(
+						async (result) => {
+							if (result instanceof Response) return result;
 
-						await updateMetaData(request, env, pipeLineStorage.orgImageName, pipeLineStorage.criteria, result);
-					}),
+							await updateMetaData(request, env, pipeLineStorage.orgImageName, pipeLineStorage.criteria, result);
+						},
+						async (e) => {
+							console.log(`Error in image analytics ai. Error: ${e}`);
+							await updateMetaData(
+								request,
+								env,
+								pipeLineStorage.orgImageName,
+								pipeLineStorage.criteria,
+								'Error in image analytics ai',
+							);
+						},
+					),
 				);
 
 				return new Response('Result received', { status: 200 });

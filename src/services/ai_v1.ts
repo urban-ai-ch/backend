@@ -68,20 +68,9 @@ export const imageAnalyticsAI = async (env: Env, url: string, criteria: Criteria
 	).catch(async (e) => {
 		console.error(`Error: ${e}`);
 		console.log('Fallback ai');
-		return await env.AI.run(
-			'@cf/llava-hf/llava-1.5-7b-hf',
-			{
-				image: [...new Uint8Array(image)],
-				prompt,
-				max_tokens: 20,
-			},
-			{
-				extraHeaders: {
-					'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
-				},
-				gateway: { id: gatewayID, collectLog: true },
-			},
-		);
+		return Promise.resolve({
+			description: 'Example ai output',
+		});
 	});
 
 	console.log(`LLM result: ${result.description}`);

@@ -23,13 +23,6 @@ type AiInput = {
 	[key in Criteria]?: string;
 };
 
-const replicate_model_owner = 'gerbernoah';
-const replicate_deployment_name = 'urban-ai-grounding-sam';
-const cloudflareAccountID = '5b90fdf2bc4e39874b024b2bc8cd5d13';
-const gatewayID = 'webdev-hs24';
-
-export const replicateURL = `https://gateway.ai.cloudflare.com/v1/${cloudflareAccountID}/${gatewayID}/replicate/deployments/${replicate_model_owner}/${replicate_deployment_name}/predictions`;
-
 export const imageAnalyticsAI = async (request: Request, env: Env, url: string): Promise<Response> => {
 	console.log('ImageAnalytics input img ' + url);
 
@@ -83,10 +76,10 @@ export const imageAnalyticsAI = async (request: Request, env: Env, url: string):
 		const imageBucketPromise = env.IMAGES_BUCKET.put(original_image_name, await original.blob(), {
 			customMetadata: metaData,
 		});
-		const cacheDeleteMetaPromise = caches.default.delete(getImageMetaURL(request.url, original_image_name));
-		const cacheDeleteImagePromise = caches.default.delete(getImageURL(request.url, original_image_name));
 
-		await Promise.allSettled([imageBucketPromise, cacheDeleteImagePromise, cacheDeleteMetaPromise]);
+		const cacheDeleteMetaPromise = caches.default.delete(getImageMetaURL(request.url, original_image_name));
+
+		await Promise.allSettled([imageBucketPromise, cacheDeleteMetaPromise]);
 
 		return new Response('Information generated', { status: 200 });
 	});
@@ -128,7 +121,7 @@ const service: Service = {
 				await env.IMAGES_BUCKET.put(payload.imageName, await original.blob(), {
 					customMetadata: metaData,
 				});
-				await caches.default.delete(getImageMetaURL(request.url, payload.imageName));
+				const imageCacheDeletePromise = caches.default.delete(getImageMetaURL(request.url, payload.imageName));
 
 				const webhookUrl = new URL(`https://${new URL(request.url).host}/webhooks/v1/replicate`);
 				webhookUrl.searchParams.set('original_image_name', payload.imageName);
@@ -140,31 +133,32 @@ const service: Service = {
 					webhook_events_filter: ['output'],
 				};
 
-				const imageKey = encodeURIComponent(new URL(input.image_url).pathname);
-				const inputKey = encodeURIComponent(input.labels.toString());
-				const cacheKey = `${replicateURL}-${imageKey}-${inputKey}`;
-				console.log('cacheKey match', cacheKey);
-
-				const response = await caches.default.match(cacheKey);
-
-				if (response) {
-					const url = await response.text();
+				const croppedImageUrl = await env.CACHE_KV.get(`grounding-sam/${JSON.stringify(input)}`);
+				if (croppedImageUrl) {
 					console.log('Grounding-Sam cached');
 
-					ctx.waitUntil(imageAnalyticsAI(request, env, url));
+					ctx.waitUntil(imageAnalyticsAI(request, env, croppedImageUrl));
 				} else {
-					const replicatePromise = fetch(replicateURL, {
-						method: 'POST',
-						body: JSON.stringify(replicateBody),
-						headers: {
-							Authorization: `Bearer ${env.REPLICATE_API_TOKEN}`,
-							'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
-							'Content-Type': 'application/json',
-							'cf-aig-skip-cache': 'true',
-						},
-					});
-
 					console.log('Grounding-Sam fetching');
+
+					const replicate_model_owner = 'gerbernoah';
+					const replicate_deployment_name = 'urban-ai-grounding-sam';
+					const cloudflareAccountID = '5b90fdf2bc4e39874b024b2bc8cd5d13';
+					const gatewayID = 'webdev-hs24';
+
+					const replicatePromise = fetch(
+						`https://gateway.ai.cloudflare.com/v1/${cloudflareAccountID}/${gatewayID}/replicate/deployments/${replicate_model_owner}/${replicate_deployment_name}/predictions`,
+						{
+							method: 'POST',
+							body: JSON.stringify(replicateBody),
+							headers: {
+								Authorization: `Bearer ${env.REPLICATE_API_TOKEN}`,
+								'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
+								'Content-Type': 'application/json',
+								'cf-aig-skip-cache': 'true',
+							},
+						},
+					);
 
 					ctx.waitUntil(replicatePromise);
 				}

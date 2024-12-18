@@ -11,11 +11,6 @@ const service: Service = {
 			case 'GET ping': {
 				return new Response('Pong');
 			}
-			case 'GET auth': {
-				if (authContext instanceof Response) return authContext;
-
-				return new Response('You are logged in. Heureka!');
-			}
 		}
 	},
 };

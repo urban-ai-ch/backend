@@ -2,6 +2,7 @@
 
 interface Env {
 	ACCOUNTS_KV: KVNamespace;
+	CACHE_KV: KVNamespace;
 	JWT_SECRET: string;
 	REPLICATE_API_TOKEN: string;
 	STRIPE_PRIVATE_KEY: string;

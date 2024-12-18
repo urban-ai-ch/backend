@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 import { Service } from '..';
-import { GroundingSamInput, imageAnalyticsAI, replicateURL } from './ai_v1';
+import { GroundingSamInput, imageAnalyticsAI } from './ai_v1';
 import Replicate, { validateWebhook } from 'replicate';
 import { updateTokenCount } from './tokens_v1';
 import { stripeSumItemsByName } from './payments_v1';
@@ -12,6 +12,8 @@ export type ReplicatePrediction<I> = {
 	status: string;
 	metrics: any;
 };
+
+var webhookVerificationKey: string;
 
 const service: Service = {
 	path: '/webhooks/v1/',
@@ -52,36 +54,18 @@ const service: Service = {
 			case 'POST replicate': {
 				const replicate = new Replicate({ auth: env.REPLICATE_API_TOKEN });
 
-				const webHookCacheKey = new Request('https://urban-ai.ch');
-				webHookCacheKey.headers.set('If-Modified-Since', new Date(Date.now() - 600000).toUTCString());
-
-				const keyResponse = await caches.default.match(webHookCacheKey);
-				let wHVKey = await keyResponse?.text();
-
-				if (!wHVKey) {
-					wHVKey = (await replicate.webhooks.default.secret.get()).key;
-					caches.default.put(webHookCacheKey, new Response(wHVKey));
-				}
-
-				const isValid = await validateWebhook(request.clone(), wHVKey);
-
+				webhookVerificationKey ??= (await replicate.webhooks.default.secret.get()).key;
+				const isValid = await validateWebhook(request.clone(), webhookVerificationKey);
 				if (!isValid) return new Response('Webhook corrupted', { status: 401 });
 
 				const prediction = await request.json<ReplicatePrediction<GroundingSamInput>>();
 
-				const imageKey = encodeURIComponent(new URL(prediction.input.image_url).pathname);
-				const inputKey = encodeURIComponent(prediction.input.labels.toString());
-				const cacheKey = `${replicateURL}-${imageKey}-${inputKey}`;
-				console.log('cacheKey put', cacheKey);
-				const cacheResponse = new Response(prediction.output, {
-					headers: {
-						'Cache-Control': 'private, max-age=31536000',
-						'Content-Type': 'text/plain',
-					},
-				});
-				await caches.default.put(cacheKey, cacheResponse);
+				const cacheKVPutPromise = env.CACHE_KV.put(
+					`grounding-sam/${JSON.stringify(prediction.input)}`,
+					prediction.output,
+				);
 
-				ctx.waitUntil(imageAnalyticsAI(request, env, prediction.output));
+				ctx.waitUntil(Promise.allSettled([cacheKVPutPromise, imageAnalyticsAI(request, env, prediction.output)]));
 
 				return new Response('Result received', { status: 200 });
 			}

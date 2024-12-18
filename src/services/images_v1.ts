@@ -79,62 +79,65 @@ const service: Service = {
 				return new Response(JSON.stringify(responses), { status });
 			}
 			case 'GET image': {
-				const cache = caches.default;
-				let response = await cache.match(request.url);
+				const cacheResponse = await caches.default.match(request.url);
+				if (cacheResponse) return cacheResponse;
 
-				if (!response) {
-					const imageName = args[1];
-					const image = await env.IMAGES_BUCKET.get(imageName);
+				const imageName = args[1];
+				const image = await env.IMAGES_BUCKET.get(imageName);
 
-					if (!image) {
-						return new Response('Image not found');
-					}
-
-					const headers = new Headers();
-					image.writeHttpMetadata(headers);
-					headers.set('etag', image.httpEtag);
-
-					response = new Response(image.body, { status: 200, headers });
-					await cache.put(request.url, response.clone());
+				if (!image) {
+					return new Response('Image not found');
 				}
 
-				const headers = new Headers(response.headers);
+				const headers = new Headers();
+				image.writeHttpMetadata(headers);
+				headers.set('etag', image.httpEtag);
 				headers.set('Cache-Control', 'private, max-age=31536000'); //1 year caching
 
-				return new Response(response.body, {
-					status: response.status,
-					headers: headers,
-				});
+				const response = new Response(image.body, { status: 200, headers });
+
+				ctx.waitUntil(caches.default.put(request.url, response.clone()));
+
+				return response;
+			}
+			case 'DELETE image': {
+				const cacheResponse = await caches.default.match(request.url);
+				if (cacheResponse) return cacheResponse;
+
+				const imageName = args[1];
+				await env.IMAGES_BUCKET.delete(imageName);
+
+				const response = new Response('Resource deleted successfully', { status: 204 });
+
+				ctx.waitUntil(caches.default.put(request.url, response.clone()));
+
+				return response;
 			}
 			case 'GET metadata': {
-				const cache = caches.default;
-				let response = await cache.match(request.url);
+				const cacheResponse = await caches.default.match(request.url);
+				if (cacheResponse) return cacheResponse;
 
-				if (!response) {
-					const imageName = args[1];
-					const image = await env.IMAGES_BUCKET.get(imageName);
+				const imageName = args[1];
+				const image = await env.IMAGES_BUCKET.get(imageName);
 
-					if (!image) {
-						return new Response('Image not found');
-					}
-
-					const metaData: ImageMetaData = {
-						materials: image.customMetadata?.materials,
-						history: image.customMetadata?.history,
-						seismic: image.customMetadata?.seismic,
-					};
-
-					response = new Response(JSON.stringify(metaData), { status: 200 });
-					await cache.put(request.url, response.clone());
+				if (!image) {
+					return new Response('Image not found');
 				}
 
-				const headers = new Headers(response.headers);
-				headers.set('Cache-Control', 'private, max-age=31536000');
+				const metaData: ImageMetaData = {
+					materials: image.customMetadata?.materials,
+					history: image.customMetadata?.history,
+					seismic: image.customMetadata?.seismic,
+				};
 
-				return new Response(response.body, {
-					status: response.status,
-					headers: headers,
+				const response = new Response(JSON.stringify(metaData), {
+					status: 200,
+					headers: { 'Cache-Control': 'private, max-age=31536000' },
 				});
+
+				ctx.waitUntil(caches.default.put(request.url, response.clone()));
+
+				return response;
 			}
 			case 'GET images': {
 				if (authContext instanceof Response) return authContext;

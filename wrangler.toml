@@ -11,6 +11,10 @@ enabled = true
 binding = "ACCOUNTS_KV"
 id = "884a5010458842d0be79511bd9844936"
 
+[[kv_namespaces]]
+binding = "CACHE_KV"
+id = "3e81e0bc7b3045618e370993d49da60d"
+
 [[r2_buckets]]
 binding = "IMAGES_BUCKET"
 bucket_name = "webdev-hs24-images"

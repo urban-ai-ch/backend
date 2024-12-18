@@ -73,12 +73,10 @@ export async function verifyJWT<T>(token: string, secret: string): Promise<T | n
 export async function hash(payload: string): Promise<string> {
 	const encodedPayload = new TextEncoder().encode(payload);
 
-	const digest = await crypto.subtle.digest(
-		{
-			name: 'SHA-256',
-		},
-		encodedPayload,
-	);
+	const digest = await crypto.subtle.digest('SHA-256', encodedPayload);
 
-	return new TextDecoder().decode(digest);
+	// Convert ArrayBuffer to a hex string
+	return Array.from(new Uint8Array(digest))
+		.map((byte) => byte.toString(16).padStart(2, '0'))
+		.join('');
 }

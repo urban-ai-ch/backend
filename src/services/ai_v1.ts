@@ -97,7 +97,7 @@ const service: Service = {
 		switch (request.method + ' ' + subPath.split('/')[0]) {
 			case 'POST detection':
 				{
-					if (await updateTokenCount(env, authContext.username, -1)) {
+					if (!(await updateTokenCount(env, authContext.username, -1))) {
 						return new Response('Not enough tokens', { status: 402 });
 					}
 

@@ -118,7 +118,21 @@ const service: Service = {
 									async (result) => {
 										if (result instanceof Response) return result;
 
-										await updateMetaData(request, env, pipeLineStorage.orgImageName, pipeLineStorage.criteria, result);
+										await updateMetaData(
+											request,
+											env,
+											pipeLineStorage.orgImageName,
+											pipeLineStorage.criteria,
+											result,
+										).catch(async () => {
+											await updateMetaData(
+												request,
+												env,
+												payload.imageName,
+												payload.criteria,
+												'Error in image analytics ai',
+											);
+										});
 									},
 								),
 							);
@@ -163,7 +177,7 @@ const service: Service = {
 				} catch (e) {
 					console.log(e);
 
-					ctx.waitUntil(updateMetaData(request, env, payload.imageName, payload.criteria, 'Crashed'));
+					ctx.waitUntil(updateMetaData(request, env, payload.imageName, payload.criteria, 'Error in grounding-sam ai'));
 					let pipeLineStorage: AIPipeLineKV | null = await env.AI_PIPELINE_KV.get(pipeLineKey, 'json');
 
 					if (pipeLineStorage) {

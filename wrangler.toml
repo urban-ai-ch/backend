@@ -9,7 +9,7 @@ enabled = true
 
 [[kv_namespaces]]
 binding = "ACCOUNTS_KV"
-id = "884a5010458842d0be79511bd9844936"
+id = "49ae5cf66cc14eaaa4f63c42a048733a"
 
 [[kv_namespaces]]
 binding = "AI_PIPELINE_KV"

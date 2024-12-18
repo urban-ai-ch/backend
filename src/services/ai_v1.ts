@@ -95,76 +95,91 @@ const service: Service = {
 		if (authContext instanceof Response) return authContext;
 
 		switch (request.method + ' ' + subPath.split('/')[0]) {
-			case 'POST detection': {
-				if (await updateTokenCount(env, authContext.username, -1)) {
-					return new Response('Not enough tokens', { status: 402 });
-				}
+			case 'POST detection':
+				{
+					if (await updateTokenCount(env, authContext.username, -1)) {
+						return new Response('Not enough tokens', { status: 402 });
+					}
 
-				const payload = await request.json<DetectionPayload>();
+					const payload = await request.json<DetectionPayload>();
 
-				const input: GroundingSamInput = {
-					image_url: getImageURL(request.url, payload.imageName),
-					labels: ['house facade'],
-				};
+					const input: GroundingSamInput = {
+						image_url: getImageURL(request.url, payload.imageName),
+						labels: ['house facade'],
+					};
 
-				const original = await env.IMAGES_BUCKET.get(payload.imageName);
-				if (!original) return new Response('Original Image not found');
+					const original = await env.IMAGES_BUCKET.get(payload.imageName);
+					if (!original) return new Response('Original Image not found');
 
-				const metaData: ImageMetaData = {
-					materials: original.customMetadata?.materials,
-					history: original.customMetadata?.history,
-					seismic: original.customMetadata?.seismic,
-				};
+					const metaData: ImageMetaData = {
+						materials: original.customMetadata?.materials,
+						history: original.customMetadata?.history,
+						seismic: original.customMetadata?.seismic,
+					};
 
-				metaData[payload.criteria] = 'Processing';
+					metaData[payload.criteria] = 'Processing';
 
-				await env.IMAGES_BUCKET.put(payload.imageName, await original.blob(), {
-					customMetadata: metaData,
-				});
-				const imageCacheDeletePromise = caches.default.delete(getImageMetaURL(request.url, payload.imageName));
+					await env.IMAGES_BUCKET.put(payload.imageName, await original.blob(), {
+						customMetadata: metaData,
+					});
+					ctx.waitUntil(caches.default.delete(getImageMetaURL(request.url, payload.imageName)));
 
-				const webhookUrl = new URL(`https://${new URL(request.url).host}/webhooks/v1/replicate`);
-				webhookUrl.searchParams.set('original_image_name', payload.imageName);
-				webhookUrl.searchParams.set('criteria', payload.criteria);
+					const webhookUrl = new URL(`https://${new URL(request.url).host}/webhooks/v1/replicate`);
+					webhookUrl.searchParams.set('original_image_name', payload.imageName);
+					webhookUrl.searchParams.set('criteria', payload.criteria);
 
-				const replicateBody: ReplicatePayload = {
-					input: input,
-					webhook: webhookUrl.toString(),
-					webhook_events_filter: ['output'],
-				};
+					const replicateBody: ReplicatePayload = {
+						input: input,
+						webhook: webhookUrl.toString(),
+						webhook_events_filter: ['output'],
+					};
 
-				const croppedImageUrl = await env.CACHE_KV.get(`grounding-sam/${JSON.stringify(input)}`);
-				if (croppedImageUrl) {
-					console.log('Grounding-Sam cached');
+					const cacheOutput: CacheKV | null = await env.CACHE_KV.get(`grounding-sam/${JSON.stringify(input)}`, 'json');
+					if (cacheOutput) {
+						if (cacheOutput.processing == true) {
+							return new Response('Job still running', { status: 200 });
+						}
 
-					ctx.waitUntil(imageAnalyticsAI(request, env, croppedImageUrl));
-				} else {
+						if (cacheOutput.url) {
+							console.log('Grounding-Sam cached');
+
+							ctx.waitUntil(imageAnalyticsAI(request, env, cacheOutput.url));
+							return new Response('Job queued', { status: 200 });
+						} else {
+							console.log('Cached url not available');
+						}
+					}
+
 					console.log('Grounding-Sam fetching');
+
+					const cacheInput: CacheKV = {
+						processing: true,
+					};
+					ctx.waitUntil(env.CACHE_KV.put(`grounding-sam/${JSON.stringify(input)}`, JSON.stringify(cacheInput)));
 
 					const replicate_model_owner = 'gerbernoah';
 					const replicate_deployment_name = 'urban-ai-grounding-sam';
 					const cloudflareAccountID = '5b90fdf2bc4e39874b024b2bc8cd5d13';
 					const gatewayID = 'webdev-hs24';
 
-					const replicatePromise = fetch(
-						`https://gateway.ai.cloudflare.com/v1/${cloudflareAccountID}/${gatewayID}/replicate/deployments/${replicate_model_owner}/${replicate_deployment_name}/predictions`,
-						{
-							method: 'POST',
-							body: JSON.stringify(replicateBody),
-							headers: {
-								Authorization: `Bearer ${env.REPLICATE_API_TOKEN}`,
-								'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
-								'Content-Type': 'application/json',
-								'cf-aig-skip-cache': 'true',
+					ctx.waitUntil(
+						fetch(
+							`https://gateway.ai.cloudflare.com/v1/${cloudflareAccountID}/${gatewayID}/replicate/deployments/${replicate_model_owner}/${replicate_deployment_name}/predictions`,
+							{
+								method: 'POST',
+								body: JSON.stringify(replicateBody),
+								headers: {
+									Authorization: `Bearer ${env.REPLICATE_API_TOKEN}`,
+									'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
+									'Content-Type': 'application/json',
+									'cf-aig-skip-cache': 'true',
+								},
 							},
-						},
+						),
 					);
-
-					ctx.waitUntil(replicatePromise);
 				}
 
 				return new Response('Job queued', { status: 200 });
-			}
 		}
 	},
 };

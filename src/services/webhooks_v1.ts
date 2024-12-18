@@ -60,9 +60,14 @@ const service: Service = {
 
 				const prediction = await request.json<ReplicatePrediction<GroundingSamInput>>();
 
+				const cache: CacheKV = {
+					processing: false,
+					url: prediction.output,
+				};
 				const cacheKVPutPromise = env.CACHE_KV.put(
 					`grounding-sam/${JSON.stringify(prediction.input)}`,
-					prediction.output,
+					JSON.stringify(cache),
+					{ expirationTtl: 60 * 60 - 1 },
 				);
 
 				ctx.waitUntil(Promise.allSettled([cacheKVPutPromise, imageAnalyticsAI(request, env, prediction.output)]));

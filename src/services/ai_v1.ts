@@ -16,7 +16,7 @@ export type GroundingSamInput = {
 };
 
 export type UformInput = {
-	imageURL: string;
+	image_url: string;
 	prompt: string;
 	max_tokens: number;
 };
@@ -99,7 +99,7 @@ export const imageAnalyticsAI = async (
 				console.log('Fallback replicate ai');
 
 				const replicateInput: UformInput = {
-					imageURL: croppedImageUrl,
+					image_url: croppedImageUrl,
 					prompt,
 					max_tokens,
 				};

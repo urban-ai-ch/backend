@@ -177,11 +177,11 @@ export const imageAnalyticsAI = async (
 				console.error(`Error in replicate uform ai. Error: ${e}`);
 
 				ctx.waitUntil(updateMetaData(request, ctx, env, orgImageName, criteria, 'Error in replicate uform ai'));
-				let groundingSamStorage: GroundingSamKV | null = await env.GROUNDING_SAM_KV.get(uformKVKey, 'json');
+				let uformStorage: UformKV | null = await env.UFORM_KV.get(uformKVKey, 'json');
 
-				if (groundingSamStorage) {
-					groundingSamStorage.processing = false;
-					ctx.waitUntil(env.GROUNDING_SAM_KV.put(uformKVKey, JSON.stringify(groundingSamStorage)));
+				if (uformStorage) {
+					uformStorage.processing = false;
+					ctx.waitUntil(env.GROUNDING_SAM_KV.put(uformKVKey, JSON.stringify(uformStorage)));
 				}
 				return new Response('Error in replicate uform ai', { status: 500 });
 			}

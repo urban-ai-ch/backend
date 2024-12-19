@@ -144,10 +144,11 @@ export const imageAnalyticsAI = async (
 					ctx.waitUntil(env.UFORM_KV.put(uformKVKey, JSON.stringify(uformStorageInput), { expirationTtl: 60 * 10 }));
 
 					const replicate_deployment_name = 'urban-ai-uform-gen2';
-
+					const rp_base = 'https://api.replicate.com/v1/';
+					const cf_base = 'https://gateway.ai.cloudflare.com/v1/${cloudflareAccountID}/${gatewayID}/replicate';
 					ctx.waitUntil(
 						fetch(
-							`https://gateway.ai.cloudflare.com/v1/${cloudflareAccountID}/${gatewayID}/replicate/deployments/${replicate_model_owner}/${replicate_deployment_name}/predictions`,
+							`https://api.replicate.com/v1/deployments/${replicate_model_owner}/${replicate_deployment_name}/predictions`,
 							{
 								method: 'POST',
 								body: JSON.stringify(uformBody),

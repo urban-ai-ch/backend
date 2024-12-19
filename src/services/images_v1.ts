@@ -36,6 +36,8 @@ export const updateMetaData = async (
 		seismic: original.customMetadata?.seismic,
 	};
 
+	console.log('Updating metadata: ', JSON.stringify(metaData));
+
 	metaData[criteria] = description;
 
 	ctx.waitUntil(

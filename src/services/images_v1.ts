@@ -36,9 +36,9 @@ export const updateMetaData = async (
 		seismic: original.customMetadata?.seismic,
 	};
 
-	console.log('Updating metadata: ', JSON.stringify(metaData));
-
 	metaData[criteria] = description;
+
+	console.log('Updating metadata: ', JSON.stringify(metaData));
 
 	ctx.waitUntil(
 		env.IMAGES_BUCKET.put(imageName, await original.blob(), {

@@ -73,9 +73,9 @@ export const imageAnalyticsAI = async (
 
 	console.log(`Uform prompt: ${prompt}`);
 
-	const max_tokens = 20;
+	const max_tokens = 50;
 
-	return await env.AI.run(
+	return env.AI.run(
 		'@cf/unum/uform-gen2-qwen-500m',
 		{
 			image: [...new Uint8Array(image)],
@@ -92,8 +92,7 @@ export const imageAnalyticsAI = async (
 		async (result) => {
 			console.log(`Cloudflare uform result: ${result.description}`);
 
-			await updateMetaData(request, ctx, env, orgImageName, criteria, result.description);
-			return new Response('Uform: Job queued');
+			return updateMetaData(request, ctx, env, orgImageName, criteria, result.description);
 		},
 		async (e) => {
 			console.error(`Error: ${e}`);

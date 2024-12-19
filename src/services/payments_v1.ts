@@ -79,7 +79,7 @@ const service: Service = {
 							adjustable_quantity: { enabled: true, minimum: 10, maximum: 999999 },
 						},
 					],
-					payment_method_types: ['twint'],
+					payment_method_types: ['twint', 'card'],
 					metadata: {
 						username: authContext.username,
 					},

@@ -139,6 +139,8 @@ export const imageAnalyticsAI = async (
 				const webhookUrl = replicateWebhookURL(request.url, UFORM_ENDPOINT_NAME);
 				webhookUrl.searchParams.set(UFORM_KEY_NAME, uformKVKey);
 
+				console.log('webhook: ', webhookUrl.toString());
+
 				const uformBody: ReplicatePayload<UformInput> = {
 					input: replicateInput,
 					webhook: webhookUrl.toString(),

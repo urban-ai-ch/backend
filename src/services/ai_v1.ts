@@ -75,117 +75,116 @@ export const imageAnalyticsAI = async (
 
 	const max_tokens = 20;
 
-	ctx.waitUntil(
-		env.AI.run(
-			'@cf/unum/uform-gen2-qwen-500m',
-			{
-				image: [...new Uint8Array(image)],
+	return await env.AI.run(
+		'@cf/unum/uform-gen2-qwen-500m',
+		{
+			image: [...new Uint8Array(image)],
+			prompt,
+			max_tokens,
+		},
+		{
+			extraHeaders: {
+				'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
+			},
+			gateway: { id: gatewayID },
+		},
+	).then(
+		async (result) => {
+			console.log(`Cloudflare uform result: ${result.description}`);
+
+			await updateMetaData(request, ctx, env, orgImageName, criteria, result.description);
+			return new Response('Uform: Job queued');
+		},
+		async (e) => {
+			console.error(`Error: ${e}`);
+			console.log('Fallback: replicate uform ai');
+
+			const replicateInput: UformInput = {
+				image_url: croppedImageUrl,
 				prompt,
 				max_tokens,
-			},
-			{
-				extraHeaders: {
-					'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
-				},
-			},
-		).then(
-			async (result) => {
-				console.log(`LLM result: ${result.description}`);
+			};
+			const uformKVKey = await hash(JSON.stringify(replicateInput));
 
-				await updateMetaData(request, ctx, env, orgImageName, criteria, result.description);
-			},
-			async (e) => {
-				console.error(`Error: ${e}`);
-				console.log('Fallback replicate ai');
+			console.log('Replicate uform: input hashed');
 
-				const replicateInput: UformInput = {
-					image_url: croppedImageUrl,
-					prompt,
-					max_tokens,
-				};
-				const uformKVKey = await hash(JSON.stringify(replicateInput));
+			try {
+				const uformStorage: UformKV | null = await env.UFORM_KV.get(uformKVKey, 'json');
 
-				console.log('Uform input hashed');
-
-				try {
-					const uformStorage: UformKV | null = await env.UFORM_KV.get(uformKVKey, 'json');
-
-					console.log('Uform kv storage loaded');
-					if (uformStorage) {
-						if (uformStorage.processing == true) {
-							console.log('Job still running');
-							return new Response('Job still running', { status: 200 });
-						}
-
-						if (uformStorage.description) {
-							console.log('Uform stored');
-
-							return await updateMetaData(
-								request,
-								ctx,
-								env,
-								uformStorage.orgImageName,
-								uformStorage.criteria,
-								uformStorage.description,
-							);
-						} else {
-							console.log('Stored description not available');
-						}
+				console.log('Replicate uform: kv storage loaded');
+				if (uformStorage) {
+					if (uformStorage.processing == true) {
+						console.log('Replicate uform: job still running');
+						return new Response('Job still running', { status: 200 });
 					}
 
-					console.log('Uform fetching');
+					if (uformStorage.description) {
+						console.log('Replicate uform: description from storage');
 
-					const webhookUrl = replicateWebhookURL(request.url, UFORM_ENDPOINT_NAME);
-					webhookUrl.searchParams.set(UFORM_KEY_NAME, uformKVKey);
-
-					const uformBody: ReplicatePayload<UformInput> = {
-						input: replicateInput,
-						webhook: webhookUrl.toString(),
-						webhook_events_filter: ['output'],
-					};
-
-					const uformStorageInput: UformKV = {
-						processing: true,
-						orgImageName: orgImageName,
-						criteria: criteria,
-					};
-					ctx.waitUntil(env.UFORM_KV.put(uformKVKey, JSON.stringify(uformStorageInput), { expirationTtl: 60 * 10 }));
-
-					const replicate_deployment_name = 'urban-ai-uform-gen2';
-
-					ctx.waitUntil(
-						fetch(
-							`https://gateway.ai.cloudflare.com/v1/${cloudflareAccountID}/${gatewayID}/replicate/deployments/${replicate_model_owner}/${replicate_deployment_name}/predictions`,
-							{
-								method: 'POST',
-								body: JSON.stringify(uformBody),
-								headers: {
-									Authorization: `Bearer ${env.REPLICATE_API_TOKEN}`,
-									'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
-									'cf-aig-skip-cache': 'true',
-								},
-							},
-						),
-					);
-
-					console.log('Uform job queued');
-					return new Response('Uform job queued', { status: 200 });
-				} catch (e) {
-					console.error(`Error in replicate uform ai. Error: ${e}`);
-
-					ctx.waitUntil(updateMetaData(request, ctx, env, orgImageName, criteria, 'Error in replicate uform ai'));
-					let groundingSamStorage: GroundingSamKV | null = await env.GROUNDING_SAM_KV.get(uformKVKey, 'json');
-
-					if (groundingSamStorage) {
-						groundingSamStorage.processing = false;
-						ctx.waitUntil(env.GROUNDING_SAM_KV.put(uformKVKey, JSON.stringify(groundingSamStorage)));
+						return await updateMetaData(
+							request,
+							ctx,
+							env,
+							uformStorage.orgImageName,
+							uformStorage.criteria,
+							uformStorage.description,
+						);
+					} else {
+						console.log('Replicate uform: stored description not available');
 					}
-					return new Response('Error in replicate uform ai', { status: 500 });
 				}
-			},
-		),
+
+				console.log('Replicate uform: fetching');
+
+				const webhookUrl = replicateWebhookURL(request.url, UFORM_ENDPOINT_NAME);
+				webhookUrl.searchParams.set(UFORM_KEY_NAME, uformKVKey);
+
+				const uformBody: ReplicatePayload<UformInput> = {
+					input: replicateInput,
+					webhook: webhookUrl.toString(),
+					webhook_events_filter: ['output'],
+				};
+
+				const uformStorageInput: UformKV = {
+					processing: true,
+					orgImageName: orgImageName,
+					criteria: criteria,
+				};
+				ctx.waitUntil(env.UFORM_KV.put(uformKVKey, JSON.stringify(uformStorageInput), { expirationTtl: 60 * 10 }));
+
+				const replicate_deployment_name = 'urban-ai-uform-gen2';
+
+				ctx.waitUntil(
+					fetch(
+						`https://gateway.ai.cloudflare.com/v1/${cloudflareAccountID}/${gatewayID}/replicate/deployments/${replicate_model_owner}/${replicate_deployment_name}/predictions`,
+						{
+							method: 'POST',
+							body: JSON.stringify(uformBody),
+							headers: {
+								Authorization: `Bearer ${env.REPLICATE_API_TOKEN}`,
+								'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
+								'cf-aig-skip-cache': 'true',
+							},
+						},
+					),
+				);
+
+				console.log('Replicate uform job queued');
+				return new Response('Uform: Job queued', { status: 200 });
+			} catch (e) {
+				console.error(`Error in replicate uform ai. Error: ${e}`);
+
+				ctx.waitUntil(updateMetaData(request, ctx, env, orgImageName, criteria, 'Error in replicate uform ai'));
+				let groundingSamStorage: GroundingSamKV | null = await env.GROUNDING_SAM_KV.get(uformKVKey, 'json');
+
+				if (groundingSamStorage) {
+					groundingSamStorage.processing = false;
+					ctx.waitUntil(env.GROUNDING_SAM_KV.put(uformKVKey, JSON.stringify(groundingSamStorage)));
+				}
+				return new Response('Error in replicate uform ai', { status: 500 });
+			}
+		},
 	);
-	return new Response('Uform job queued');
 };
 
 const groundingSam = async (
@@ -224,7 +223,7 @@ const groundingSam = async (
 			}
 
 			if (groundingSamStorage.croppedImageUrl) {
-				console.log('Grounding-Sam stored');
+				console.log('Replicate grounding-sam: KV storage loaded');
 
 				return await imageAnalyticsAI(
 					request,
@@ -235,11 +234,11 @@ const groundingSam = async (
 					groundingSamStorage.orgImageName,
 				);
 			} else {
-				console.log('Stored url not available');
+				console.log('Replicate grounding-sam: Stored url not available');
 			}
 		}
 
-		console.log('Grounding-Sam fetching');
+		console.log('Replicate grounding-sam: Fetching');
 
 		const groundingSamStorageInput: GroundingSamKV = {
 			orgImageName: orgImageName,
@@ -267,7 +266,7 @@ const groundingSam = async (
 			),
 		);
 
-		return new Response('Grounding-sam ai queued', { status: 200 });
+		return new Response('Grounding-sam: Job queued', { status: 200 });
 	} catch (e) {
 		console.error(`Error in replicate grounding-sam ai. Error: ${e}`);
 

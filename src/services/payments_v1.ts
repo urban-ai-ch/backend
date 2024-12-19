@@ -1,4 +1,5 @@
 import { Service } from '..';
+import { AccountKV } from '../types';
 import { authenticateToken } from './auth_v1';
 
 import Stripe from 'stripe';

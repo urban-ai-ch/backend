@@ -146,8 +146,9 @@ export const imageAnalyticsAI = async (
 					const replicate_deployment_name = 'urban-ai-uform-gen2';
 					const rp_base = 'https://api.replicate.com/v1/';
 					const cf_base = 'https://gateway.ai.cloudflare.com/v1/${cloudflareAccountID}/${gatewayID}/replicate';
-					ctx.waitUntil(
-						fetch(
+
+					return (
+						await fetch(
 							`https://api.replicate.com/v1/deployments/${replicate_model_owner}/${replicate_deployment_name}/predictions`,
 							{
 								method: 'POST',
@@ -160,9 +161,8 @@ export const imageAnalyticsAI = async (
 								},
 							},
 						),
+						console.log('Uform job queued')
 					);
-
-					console.log('Uform job queued');
 					return new Response('Uform job queued', { status: 200 });
 				} catch (e) {
 					console.error(`Error in replicate uform ai. Error: ${e}`);

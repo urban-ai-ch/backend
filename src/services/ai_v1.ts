@@ -266,6 +266,7 @@ const groundingSam = async (
 			),
 		);
 
+		console.log('Replicate grounding-sam: Job queued');
 		return new Response('Grounding-sam: Job queued', { status: 200 });
 	} catch (e) {
 		console.error(`Error in replicate grounding-sam ai. Error: ${e}`);

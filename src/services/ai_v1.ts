@@ -97,6 +97,8 @@ export const imageAnalyticsAI = async (
 
 				const uformKVKey = await hash(JSON.stringify(input));
 
+				console.log('Uform input hashed');
+
 				try {
 					const webhookUrl = replicateWebhookURL(request.url, UFORM_ENDPOINT_NAME);
 					webhookUrl.searchParams.set(UFORM_KEY_NAME, uformKVKey);
@@ -108,8 +110,11 @@ export const imageAnalyticsAI = async (
 					};
 
 					const uformStorage: UformKV | null = await env.UFORM_KV.get(uformKVKey, 'json');
+
+					console.log('Uform kv storage loaded');
 					if (uformStorage) {
 						if (uformStorage.processing == true) {
+							console.log('Job still running');
 							return new Response('Job still running', { status: 200 });
 						}
 
@@ -156,7 +161,8 @@ export const imageAnalyticsAI = async (
 						),
 					);
 
-					return new Response('Uform ai queued', { status: 200 });
+					console.log('Uform job queued');
+					return new Response('Uform job queued', { status: 200 });
 				} catch (e) {
 					console.error(`Error in replicate uform ai. Error: ${e}`);
 

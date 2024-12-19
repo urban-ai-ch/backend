@@ -147,22 +147,21 @@ export const imageAnalyticsAI = async (
 					const rp_base = 'https://api.replicate.com/v1/';
 					const cf_base = 'https://gateway.ai.cloudflare.com/v1/${cloudflareAccountID}/${gatewayID}/replicate';
 
-					return (
-						await fetch(
-							`https://api.replicate.com/v1/deployments/${replicate_model_owner}/${replicate_deployment_name}/predictions`,
-							{
-								method: 'POST',
-								body: JSON.stringify(uformBody),
-								headers: {
-									Authorization: `Bearer ${env.REPLICATE_API_TOKEN}`,
-									'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
-									'Content-Type': 'application/json',
-									'cf-aig-skip-cache': 'true',
-								},
+					const a = await fetch(
+						`https://api.replicate.com/v1/deployments/${replicate_model_owner}/${replicate_deployment_name}/predictions`,
+						{
+							method: 'POST',
+							body: JSON.stringify(uformBody),
+							headers: {
+								Authorization: `Bearer ${env.REPLICATE_API_TOKEN}`,
+								'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
+								'Content-Type': 'application/json',
+								'cf-aig-skip-cache': 'true',
 							},
-						),
-						console.log('Uform job queued')
+						},
 					);
+					console.log(a);
+					console.log('Uform job queued');
 					return new Response('Uform job queued', { status: 200 });
 				} catch (e) {
 					console.error(`Error in replicate uform ai. Error: ${e}`);

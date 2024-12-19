@@ -160,7 +160,8 @@ export const imageAnalyticsAI = async (
 							},
 						},
 					);
-					console.log(a);
+					console.log('json: ', JSON.stringify(a));
+					console.log('text: ', await a.text());
 					console.log('Uform job queued');
 					return new Response('Uform job queued', { status: 200 });
 				} catch (e) {

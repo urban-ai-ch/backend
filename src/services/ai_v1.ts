@@ -16,7 +16,7 @@ export type GroundingSamInput = {
 };
 
 export type UformInput = {
-	image: number[];
+	imageURL: string;
 	prompt: string;
 	max_tokens: number;
 };
@@ -73,19 +73,22 @@ export const imageAnalyticsAI = async (
 
 	console.log(`Uform prompt: ${prompt}`);
 
-	const input: UformInput = {
-		image: [...new Uint8Array(image)],
-		prompt,
-		max_tokens: 20,
-	};
+	const max_tokens = 20;
 
 	ctx.waitUntil(
-		env.AI.run('@cf/unum/uform-gen2-qwen-500m', input, {
-			extraHeaders: {
-				'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
+		env.AI.run(
+			'@cf/unum/uform-gen2-qwen-500m',
+			{
+				image: [...new Uint8Array(image)],
+				prompt,
+				max_tokens,
 			},
-			gateway: { id: gatewayID, collectLog: true },
-		}).then(
+			{
+				extraHeaders: {
+					'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
+				},
+			},
+		).then(
 			async (result) => {
 				console.log(`LLM result: ${result.description}`);
 
@@ -95,20 +98,16 @@ export const imageAnalyticsAI = async (
 				console.error(`Error: ${e}`);
 				console.log('Fallback replicate ai');
 
-				const uformKVKey = await hash(JSON.stringify(input));
+				const replicateInput: UformInput = {
+					imageURL: croppedImageUrl,
+					prompt,
+					max_tokens,
+				};
+				const uformKVKey = await hash(JSON.stringify(replicateInput));
 
 				console.log('Uform input hashed');
 
 				try {
-					const webhookUrl = replicateWebhookURL(request.url, UFORM_ENDPOINT_NAME);
-					webhookUrl.searchParams.set(UFORM_KEY_NAME, uformKVKey);
-
-					const uformBody: ReplicatePayload<UformInput> = {
-						input,
-						webhook: webhookUrl.toString(),
-						webhook_events_filter: ['output'],
-					};
-
 					const uformStorage: UformKV | null = await env.UFORM_KV.get(uformKVKey, 'json');
 
 					console.log('Uform kv storage loaded');
@@ -136,6 +135,15 @@ export const imageAnalyticsAI = async (
 
 					console.log('Uform fetching');
 
+					const webhookUrl = replicateWebhookURL(request.url, UFORM_ENDPOINT_NAME);
+					webhookUrl.searchParams.set(UFORM_KEY_NAME, uformKVKey);
+
+					const uformBody: ReplicatePayload<UformInput> = {
+						input: replicateInput,
+						webhook: webhookUrl.toString(),
+						webhook_events_filter: ['output'],
+					};
+
 					const uformStorageInput: UformKV = {
 						processing: true,
 						orgImageName: orgImageName,
@@ -144,24 +152,22 @@ export const imageAnalyticsAI = async (
 					ctx.waitUntil(env.UFORM_KV.put(uformKVKey, JSON.stringify(uformStorageInput), { expirationTtl: 60 * 10 }));
 
 					const replicate_deployment_name = 'urban-ai-uform-gen2';
-					const rp_base = 'https://api.replicate.com/v1/';
-					const cf_base = 'https://gateway.ai.cloudflare.com/v1/${cloudflareAccountID}/${gatewayID}/replicate';
 
-					const a = await fetch(
-						`https://api.replicate.com/v1/deployments/${replicate_model_owner}/${replicate_deployment_name}/predictions`,
-						{
-							method: 'POST',
-							body: JSON.stringify(uformBody),
-							headers: {
-								Authorization: `Bearer ${env.REPLICATE_API_TOKEN}`,
-								'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
-								'Content-Type': 'application/json',
-								'cf-aig-skip-cache': 'true',
+					ctx.waitUntil(
+						fetch(
+							`https://gateway.ai.cloudflare.com/v1/${cloudflareAccountID}/${gatewayID}/replicate/deployments/${replicate_model_owner}/${replicate_deployment_name}/predictions`,
+							{
+								method: 'POST',
+								body: JSON.stringify(uformBody),
+								headers: {
+									Authorization: `Bearer ${env.REPLICATE_API_TOKEN}`,
+									'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
+									'cf-aig-skip-cache': 'true',
+								},
 							},
-						},
+						),
 					);
-					console.log('json: ', JSON.stringify(a));
-					console.log('text: ', await a.text());
+
 					console.log('Uform job queued');
 					return new Response('Uform job queued', { status: 200 });
 				} catch (e) {
@@ -255,7 +261,6 @@ const groundingSam = async (
 					headers: {
 						Authorization: `Bearer ${env.REPLICATE_API_TOKEN}`,
 						'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
-						'Content-Type': 'application/json',
 						'cf-aig-skip-cache': 'true',
 					},
 				},

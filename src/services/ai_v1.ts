@@ -228,14 +228,7 @@ const groundingSam = async (
 			if (groundingSamStorage.croppedImageUrl) {
 				console.log('Replicate grounding-sam: KV storage loaded');
 
-				return await imageAnalyticsAI(
-					request,
-					env,
-					ctx,
-					groundingSamStorage.croppedImageUrl,
-					groundingSamStorage.criteria,
-					groundingSamStorage.orgImageName,
-				);
+				return await imageAnalyticsAI(request, env, ctx, groundingSamStorage.croppedImageUrl, criteria, orgImageName);
 			} else {
 				console.log('Replicate grounding-sam: Stored url not available');
 			}

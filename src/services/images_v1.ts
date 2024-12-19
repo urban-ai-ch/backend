@@ -21,11 +21,12 @@ export const getImageMetaURL = (url: string, imageName: string): string => {
 
 export const updateMetaData = async (
 	request: Request,
+	ctx: ExecutionContext,
 	env: Env,
 	imageName: string,
 	criteria: Criteria,
 	description: string,
-) => {
+): Promise<Response> => {
 	const original = await env.IMAGES_BUCKET.get(imageName);
 	if (!original) return new Response('Original Image not found', { status: 400 });
 
@@ -37,13 +38,13 @@ export const updateMetaData = async (
 
 	metaData[criteria] = description;
 
-	const imageBucketPromise = env.IMAGES_BUCKET.put(imageName, await original.blob(), {
-		customMetadata: metaData,
-	});
+	ctx.waitUntil(
+		env.IMAGES_BUCKET.put(imageName, await original.blob(), {
+			customMetadata: metaData,
+		}),
+	);
 
-	const cacheDeleteMetaPromise = caches.default.delete(getImageMetaURL(request.url, imageName));
-
-	await Promise.allSettled([imageBucketPromise, cacheDeleteMetaPromise]);
+	ctx.waitUntil(caches.default.delete(getImageMetaURL(request.url, imageName)));
 
 	return new Response('Information generated', { status: 200 });
 };

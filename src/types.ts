@@ -7,11 +7,18 @@ export type AccountKV = {
 	bio?: string;
 };
 
-export type AIPipeLineKV = {
+export type GroundingSamKV = {
 	processing: boolean;
-	criteria: Criteria;
 	orgImageName: string;
+	criteria: Criteria;
 	croppedImageUrl?: string;
+};
+
+export type UformKV = {
+	processing: boolean;
+	orgImageName: string;
+	criteria: Criteria;
+	description?: string;
 };
 
 export type TokensRow = {

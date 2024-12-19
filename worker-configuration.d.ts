@@ -2,7 +2,8 @@
 
 interface Env {
 	ACCOUNTS_KV: KVNamespace;
-	AI_PIPELINE_KV: KVNamespace;
+	UFORM_KV: KVNamespace;
+	GROUNDING_SAM_KV: KVNamespace;
 	JWT_SECRET: string;
 	REPLICATE_API_TOKEN: string;
 	STRIPE_PRIVATE_KEY: string;
